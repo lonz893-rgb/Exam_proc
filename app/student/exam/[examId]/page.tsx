@@ -18,7 +18,7 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
   const [examStarted, setExamStarted] = useState(false)
   const [violations, setViolations] = useState<Violation[]>([])
   const [isBlocked, setIsBlocked] = useState(false)
-  const [timeRemaining, setTimeRemaining] = useState(0) // Initialize with 0
+  const [timeRemaining, setTimeRemaining] = useState(0)
   const [lastActivity, setLastActivity] = useState(Date.now())
   const [showWarning, setShowWarning] = useState(false)
   const [warningMessage, setWarningMessage] = useState("")
@@ -26,11 +26,9 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
   const router = useRouter()
   const { toast } = useToast()
 
-  // Get exam data from localStorage
   const [examData, setExamData] = useState<any>(null)
 
   useEffect(() => {
-    // Load exam data from localStorage
     const currentExam = localStorage.getItem("currentExam")
     if (currentExam) {
       const exam = JSON.parse(currentExam)
@@ -40,16 +38,15 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
         duration: exam.duration,
         uniqueId: exam.uniqueId,
       })
-      setTimeRemaining(exam.duration * 60) // Convert minutes to seconds
+      setTimeRemaining(exam.duration * 60)
     } else {
-      // Fallback to mock data if no current exam
       setExamData({
         title: "Mathematics Final Exam",
         formUrl: "https://docs.google.com/forms/d/e/1FAIpQLSf_example/viewform",
         duration: 120,
         uniqueId: "MATH2024001",
       })
-      setTimeRemaining(120 * 60) // Convert minutes to seconds
+      setTimeRemaining(120 * 60)
     }
   }, [])
 
@@ -63,12 +60,10 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
 
       setViolations((prev) => [...prev, violation])
 
-      // Get student data from localStorage
       const studentData = localStorage.getItem("studentData")
       const student = studentData ? JSON.parse(studentData) : null
       const sessionId = localStorage.getItem("examSessionId")
 
-      // Send to server
       fetch("/api/violations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -85,12 +80,10 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
 
       console.log("[v0] Violation logged:", violation)
 
-      // Show warning
       setWarningMessage(description)
       setShowWarning(true)
       setIsBlocked(true)
 
-      // Auto-unblock after 10 seconds
       setTimeout(() => {
         setShowWarning(false)
         setIsBlocked(false)
@@ -102,10 +95,9 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
         variant: "destructive",
       })
     },
-    [toast, params.examId],
+    [toast, params.examId, examData],
   )
 
-  // Fullscreen management
   const enterFullscreen = useCallback(() => {
     const elem = document.documentElement
     if (elem.requestFullscreen) {
@@ -119,20 +111,10 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
     }
   }, [])
 
-  // Activity monitoring
   const updateActivity = useCallback(() => {
     setLastActivity(Date.now())
   }, [])
 
-  // Handle window blur detection (Alt+Tab, App switching)
-  // This detects when the browser window loses focus completely
-
-
-  // Track if focus was lost to detect real tab switches vs iframe interactions
-  let hadFocusLoss = false
-  let blurTime = 0
-
-  // Event listeners
   useEffect(() => {
     if (!examStarted) return
 
@@ -146,77 +128,57 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
     }
 
     const handleVisibilityChange = () => {
-      // document.hidden is ONLY true when actually switching tabs or minimizing
-      // It stays false when clicking iframes
       if (document.hidden && examStarted && !isBlocked) {
         logViolation("TAB_SWITCH", "Student switched tabs, minimized window, or switched applications")
       }
-    }
-
-    const handleFocus = () => {
-      hadFocusLoss = false
-      blurTime = 0
-    }
-
-    const handleBlurEvent = () => {
-      hadFocusLoss = true
-      blurTime = Date.now()
     }
 
     const handleKeyDown = (e: KeyboardEvent) => {
       updateActivity()
 
       if (examStarted) {
-        // Block Alt+Tab
         if (e.altKey && e.key === "Tab") {
           e.preventDefault()
           logViolation("ALT_TAB", "Student attempted to use Alt+Tab to switch applications")
           return false
         }
 
-        // Block Ctrl+Alt+Tab
         if (e.ctrlKey && e.altKey && e.key === "Tab") {
           e.preventDefault()
           logViolation("ALT_TAB", "Student attempted to use Alt+Tab to switch applications")
           return false
         }
 
-        // Block new tab/window/close tab shortcuts
         if (e.ctrlKey && (e.key === "t" || e.key === "n" || e.key === "w")) {
           e.preventDefault()
           logViolation("KEYBOARD_SHORTCUT", `Student attempted to use Ctrl+${e.key.toUpperCase()}`)
           return false
         }
 
-        // Block paste (Ctrl+V and Cmd+V for Mac)
         if ((e.ctrlKey || e.metaKey) && e.key === "v") {
           e.preventDefault()
           logViolation("PASTE_ATTEMPT", "Student attempted to paste content")
           return false
         }
 
-        // Block copy (Ctrl+C and Cmd+C for Mac)
         if ((e.ctrlKey || e.metaKey) && e.key === "c") {
           e.preventDefault()
           logViolation("COPY_ATTEMPT", "Student attempted to copy content")
           return false
         }
 
-        // Block cut (Ctrl+X and Cmd+X for Mac)
         if ((e.ctrlKey || e.metaKey) && e.key === "x") {
           e.preventDefault()
           logViolation("CUT_ATTEMPT", "Student attempted to cut content")
           return false
         }
 
-        // Block select all (Ctrl+A and Cmd+A for Mac)
         if ((e.ctrlKey || e.metaKey) && e.key === "a") {
           e.preventDefault()
           logViolation("SELECT_ALL", "Student attempted to select all content")
           return false
         }
 
-        // Block developer tools
         if (e.key === "F12" || (e.ctrlKey && e.shiftKey && e.key === "I") || (e.ctrlKey && e.shiftKey && e.key === "K")) {
           e.preventDefault()
           logViolation("DEV_TOOLS", "Student attempted to open developer tools")
@@ -229,7 +191,14 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
       updateActivity()
     }
 
-    // Prevent right-click context menu
+    const handleClick = () => {
+      updateActivity()
+    }
+
+    const handleScroll = () => {
+      updateActivity()
+    }
+
     const handleContextMenu = (e: MouseEvent) => {
       if (examStarted) {
         e.preventDefault()
@@ -240,10 +209,8 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
       }
     }
 
-    // Also handle mousedown for right-click
     const handleMouseDown = (e: MouseEvent) => {
       if (examStarted && e.button === 2) {
-        // button 2 is right-click
         e.preventDefault()
         e.stopPropagation()
         logViolation("RIGHT_CLICK", "Student attempted to right-click")
@@ -289,11 +256,12 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
       }
     }
 
-    // Add all event listeners
     document.addEventListener("fullscreenchange", handleFullscreenChange)
     document.addEventListener("visibilitychange", handleVisibilityChange)
     document.addEventListener("keydown", handleKeyDown, true)
     document.addEventListener("mousemove", handleMouseMove)
+    document.addEventListener("click", handleClick)
+    document.addEventListener("scroll", handleScroll, true)
     document.addEventListener("mousedown", handleMouseDown, true)
     document.addEventListener("contextmenu", handleContextMenu, true)
     document.addEventListener("selectstart", handleSelectStart)
@@ -301,10 +269,6 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
     document.addEventListener("paste", handlePaste, true)
     document.addEventListener("copy", handleCopy, true)
     document.addEventListener("cut", handleCut, true)
-    
-    // Window focus/blur for detecting real tab switches vs iframe interactions
-    window.addEventListener("blur", handleBlurEvent)
-    window.addEventListener("focus", handleFocus)
     window.addEventListener("contextmenu", handleContextMenu, true)
 
     return () => {
@@ -312,6 +276,8 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       document.removeEventListener("keydown", handleKeyDown, true)
       document.removeEventListener("mousemove", handleMouseMove)
+      document.removeEventListener("click", handleClick)
+      document.removeEventListener("scroll", handleScroll, true)
       document.removeEventListener("mousedown", handleMouseDown, true)
       document.removeEventListener("contextmenu", handleContextMenu, true)
       document.removeEventListener("selectstart", handleSelectStart)
@@ -319,28 +285,23 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
       document.removeEventListener("paste", handlePaste, true)
       document.removeEventListener("copy", handleCopy, true)
       document.removeEventListener("cut", handleCut, true)
-      window.removeEventListener("blur", handleBlurEvent)
-      window.removeEventListener("focus", handleFocus)
       window.removeEventListener("contextmenu", handleContextMenu, true)
     }
-  }, [examStarted, logViolation, updateActivity])
+  }, [examStarted, logViolation, updateActivity, isBlocked])
 
-  // Inactivity monitoring
   useEffect(() => {
     if (!examStarted) return
 
     const checkInactivity = setInterval(() => {
       const timeSinceLastActivity = Date.now() - lastActivity
       if (timeSinceLastActivity > 300000) {
-        // 5 minutes
         logViolation("INACTIVITY", "Student inactive for more than 5 minutes")
       }
-    }, 60000) // Check every minute
+    }, 60000)
 
     return () => clearInterval(checkInactivity)
   }, [examStarted, lastActivity, logViolation])
 
-  // Timer
   useEffect(() => {
     if (!examStarted) return
 
@@ -362,7 +323,6 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
     setExamStarted(true)
     updateActivity()
 
-    // Create exam session in database
     const studentData = localStorage.getItem("studentData")
     const student = studentData ? JSON.parse(studentData) : null
 
@@ -383,8 +343,7 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
         console.log("[v0] Exam session created:", data)
 
         if (data.sessionId) {
-          // Store session ID for use in violation logging
-          localStorage.setItem("examSessionId", data.sessionId)
+          localStorage.setItem("examSessionId", data.sessionId.toString())
         }
       } catch (error) {
         console.error("[v0] Failed to create exam session:", error)
@@ -406,7 +365,6 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
       description: "Your responses have been recorded.",
     })
 
-    // Redirect back to dashboard
     setTimeout(() => {
       router.push("/")
     }, 2000)
@@ -489,14 +447,12 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
 
   return (
     <div className="min-h-screen bg-white">
-      {/* CSS for interaction protection */}
       <style jsx>{`
         body {
           -webkit-app-region: no-drag;
           overflow-x: hidden;
         }
         
-        /* Allow normal interaction with form elements */
         input, textarea, select, button, label, a {
           -webkit-user-select: auto;
           -moz-user-select: auto;
@@ -505,7 +461,6 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
         }
       `}</style>
 
-      {/* Proctoring Header */}
       <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Eye className="h-4 w-4" />
@@ -527,7 +482,6 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
         </div>
       </div>
 
-      {/* Exam Content */}
       <div className="p-4">
         {isBlocked ? (
           <div className="flex items-center justify-center h-96">
