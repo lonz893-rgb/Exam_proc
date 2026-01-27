@@ -6,6 +6,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { AlertTriangle, Shield, Clock, Eye } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
+import { use } from "react";
 
 interface Violation {
   type: string
@@ -13,7 +14,9 @@ interface Violation {
   description: string
 }
 
-export default function ExamPage({ params }: { params: { examId: string } }) {
+export default function ExamPage({ params }: { params: Promise<{ examId: string }> }) {
+  const unwrappedParams = use(params); // "Unwrap" the promise to get the actual examId
+  const examId = unwrappedParams.examId; 
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [examStarted, setExamStarted] = useState(false)
   const [violations, setViolations] = useState<Violation[]>([])
@@ -70,7 +73,7 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
         body: JSON.stringify({
           violationType: type,
           description: description,
-          examId: params.examId,
+          examId: examId,
           examSessionId: sessionId ? parseInt(sessionId) : null,
           timestamp: new Date().toISOString(),
           studentName: student?.name || "Unknown Student",
@@ -95,7 +98,7 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
         variant: "destructive",
       })
     },
-    [toast, params.examId, examData],
+    [toast, examId, examData],
   )
 
   const enterFullscreen = useCallback(() => {
@@ -332,10 +335,10 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            examId: params.examId,
+            examId: examId,
             studentId: student.id,
             studentName: student.name,
-            sessionToken: `${params.examId}-${student.id}-${Date.now()}`,
+            sessionToken: `${examId}-${student.id}-${Date.now()}`,
           }),
         })
 
