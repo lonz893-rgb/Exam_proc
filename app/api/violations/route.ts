@@ -61,7 +61,23 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { examSessionId, studentName, examTitle, violationType, description, severity, examId, timestamp } = await request.json()
+
+    // 1. Get the data first
+    const body = await request.json()
+
+    // 2. ADD THIS LINE HERE TO DEBUG
+    console.log("DEBUG: Received body from student page:", body)
+
+    const { 
+      examSessionId, 
+      studentName, 
+      examTitle, 
+      violationType, 
+      description, 
+      severity, 
+      examId, 
+      timestamp 
+    } = body
 
     if (!violationType || !description) {
       return NextResponse.json({ success: false, message: "Missing required fields" }, { status: 400 })
