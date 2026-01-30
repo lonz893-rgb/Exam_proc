@@ -43,14 +43,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { examId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ examId: string }> }) {
   try {
-    const { examId } = params
+    // 2. Await the params to get the actual examId
+    const { examId } = await params;
 
     if (!examId) {
       return NextResponse.json({ success: false, message: "Exam ID is required" }, { status: 400 })
     }
 
+    console.log("[v0] Deleting exam ID:", examId);
+    
     const query = `DELETE FROM exams WHERE id = ?`
 
     await executeQuery(query, [examId])
