@@ -344,7 +344,7 @@ CREATE TABLE `students` (
   `email` varchar(255) DEFAULT NULL,
   `department` varchar(255) DEFAULT NULL,
   `year_level` int(11) DEFAULT NULL,
-  `status` enum('active','inactive','graduated') DEFAULT 'active',
+  `status` enum('active','suspended','graduated') DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
