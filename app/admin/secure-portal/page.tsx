@@ -52,10 +52,10 @@ interface Teacher {
 
 interface SystemLog {
   id: string
-  log_type: "login" | "violation" | "system" | "error"
+  log_type: string // This maps to 'action' in DB
   user_type: "student" | "teacher" | "admin" | "system"
-  message: string
-  timestamp: string
+  message: string  // This maps to 'description' in DB
+  timestamp: string // This maps to 'created_at' in DB
   severity: "low" | "medium" | "high"
 }
 
@@ -1052,29 +1052,28 @@ export default function AdminPortal() {
           <TabsContent value="system" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>System Activity Logs ({systemLogs.length})</CardTitle>
-                <CardDescription>Monitor system events and security alerts</CardDescription>
+                <CardTitle>System Activity Logs</CardTitle>
+                <CardDescription>Real-time audit trail of all system actions</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {systemLogs.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No system logs found.</p>
+                      <p>No activity logs found.</p>
                     </div>
                   ) : (
                     systemLogs.map((log) => (
-                      <div key={log.id} className="flex items-start justify-between p-4 border rounded-lg">
+                      <div key={log.id} className="flex items-start justify-between p-4 border rounded-lg bg-white shadow-sm">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline">{log.log_type}</Badge>
-                            <Badge variant="outline">{log.user_type}</Badge>
+                            <Badge variant="outline" className="capitalize">{log.user_type}</Badge>
+                            <Badge className={getSeverityColor(log.severity)}>{log.log_type}</Badge>
                           </div>
-                          <p className="text-sm">{log.message}</p>
-                        </div>
-
-                        <div className="text-right text-sm text-gray-600">
-                          <p>{new Date(log.timestamp).toLocaleString()}</p>
+                          <p className="text-sm font-medium text-gray-900">{log.message}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </p>
                         </div>
                       </div>
                     ))
