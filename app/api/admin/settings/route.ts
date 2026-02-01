@@ -38,8 +38,8 @@ export async function PUT(request: NextRequest) {
 
     // Log the action
     const logQuery = `
-      INSERT INTO system_logs (log_type, user_type, message) 
-      VALUES (?, ?, ?)
+      INSERT INTO system_logs (action, user_type, user_id, description, ip_address) 
+      VALUES (?, ?, ?, ?, ?)
     `
     await executeQuery(logQuery, ["system", "admin", "System settings updated"])
 
