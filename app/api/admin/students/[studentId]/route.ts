@@ -5,7 +5,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   try {
     const { studentId } = await params;
     console.log("Updating student:", studentId)
-    const { name, email, student_id, status } = await request.json()
+    const body = await request.json();
+    const { name, email, student_id, status } = body;
 
     if (!name || !email || !student_id) {
       return NextResponse.json({ success: false, message: "Name, email, and student ID are required" }, { status: 400 })
@@ -15,7 +16,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       UPDATE students 
       SET name = ?, email = ?, student_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `
+    `;
+    
     const result = await executeQuery(query, [name, email, student_id, status, studentId])
 
     if (result.affectedRows === 0) {
