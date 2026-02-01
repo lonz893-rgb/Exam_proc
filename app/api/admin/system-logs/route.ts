@@ -8,8 +8,11 @@ export async function GET(request: NextRequest) {
   try {
     console.log("Fetching system logs...")
     const { searchParams } = new URL(request.url)
-    const limit = Number.parseInt(searchParams.get("limit") || "50", 10);
+    const limitInput = searchParams.get("limit") || "50";
+    const limit = Math.min(Math.max(parseInt(limitInput, 10) || 50, 1), 500);
 
+    // We use a template literal for LIMIT here to avoid the 
+    // "Incorrect arguments to mysqld_stmt_execute" error.
     const query = `
       SELECT 
         id,
@@ -21,11 +24,11 @@ export async function GET(request: NextRequest) {
         'medium' as severity
       FROM system_logs 
       ORDER BY timestamp DESC 
-      LIMIT ?
+      LIMIT ${limit}
     `;
     
     // Passing the limit as a number parameter
-    const logs = await executeQuery(query, [limit]);
+    const logs = await executeQuery(query, []);
 
     return NextResponse.json({
       success: true,
