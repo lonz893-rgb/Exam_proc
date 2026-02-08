@@ -1,6 +1,6 @@
 "use client"
-
-import { useState, useEffect, useCallback } from "react"
+export const dynamic = "force-dynamic";
+import { useRef, useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertTriangle, Shield, Clock, Eye } from "lucide-react"
@@ -15,19 +15,19 @@ interface Violation {
 }
 
 export default function ExamPage({ params }: { params: Promise<{ examId: string }> }) {
-  const unwrappedParams = use(params); // "Unwrap" the promise to get the actual examId
-  const examId = unwrappedParams.examId; 
-  const [isFullscreen, setIsFullscreen] = useState(false)
+  const unwrappedParams = use(params);
+  const examId = unwrappedParams.examId;
+  const [isFullscreen, setIsFullscreen] = useState(false) 
   const [examStarted, setExamStarted] = useState(false)
   const [violations, setViolations] = useState<Violation[]>([])
   const [isBlocked, setIsBlocked] = useState(false)
-  const [timeRemaining, setTimeRemaining] = useState(0)
   const [lastActivity, setLastActivity] = useState(Date.now())
   const [showWarning, setShowWarning] = useState(false)
   const [warningMessage, setWarningMessage] = useState("")
 
   const router = useRouter()
   const { toast } = useToast()
+  const iframeRef = useRef<HTMLIFrameElement>(null)
 
   const [examData, setExamData] = useState<any>(null)
 
@@ -41,7 +41,6 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         duration: exam.duration,
         uniqueId: exam.uniqueId,
       })
-      setTimeRemaining(exam.duration * 60)
     } else {
       setExamData({
         title: "Mathematics Final Exam",
@@ -49,7 +48,6 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         duration: 120,
         uniqueId: "MATH2024001",
       })
-      setTimeRemaining(120 * 60)
     }
   }, [])
 
@@ -104,13 +102,18 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
   const enterFullscreen = useCallback(() => {
     const elem = document.documentElement
     if (elem.requestFullscreen) {
-      elem.requestFullscreen()
+      elem.requestFullscreen().catch((err) => {
+        console.error("Fullscreen request failed:", err)
+        // If fullscreen fails, log but don't block the exam
+      })
     }
   }, [])
 
   const exitFullscreen = useCallback(() => {
-    if (document.exitFullscreen) {
-      document.exitFullscreen()
+    if (document.fullscreenElement && document.exitFullscreen) {
+      document.exitFullscreen().catch((err) => {
+        console.error("Exit fullscreen failed:", err)
+      })
     }
   }, [])
 
@@ -127,10 +130,14 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
 
       if (!isCurrentlyFullscreen && examStarted) {
         logViolation("FULLSCREEN_EXIT", "Student exited fullscreen mode during exam")
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
       }
     }
 
     const handleVisibilityChange = () => {
+      // document.hidden is ONLY true when actually switching tabs or minimizing
+      // It stays false when clicking iframes
       if (document.hidden && examStarted && !isBlocked) {
         logViolation("TAB_SWITCH", "Student switched tabs, minimized window, or switched applications")
       }
@@ -290,8 +297,42 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
       document.removeEventListener("cut", handleCut, true)
       window.removeEventListener("contextmenu", handleContextMenu, true)
     }
-  }, [examStarted, logViolation, updateActivity, isBlocked])
+  }, [examStarted, logViolation, updateActivity, isBlocked, enterFullscreen])
 
+  // Continuous fullscreen enforcement - check every 500ms for faster response
+  useEffect(() => {
+    if (!examStarted) return
+
+    const enforceFullscreen = setInterval(() => {
+      const isCurrentlyFullscreen = !!document.fullscreenElement
+      if (!isCurrentlyFullscreen && !isBlocked) {
+        // Only try to re-enter if not currently showing a violation warning
+        console.log("[v0] Fullscreen lost, attempting re-entry...")
+        enterFullscreen()
+      }
+    }, 500) // Check twice per second for faster re-entry
+
+    return () => clearInterval(enforceFullscreen)
+  }, [examStarted, enterFullscreen, isBlocked])
+
+  // Prevent page refresh/close during exam
+  useEffect(() => {
+    if (!examStarted) return
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = '' // Required for Chrome
+      return '' // Required for some browsers
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+    }
+  }, [examStarted])
+
+  // Inactivity monitoring (keep this)
   useEffect(() => {
     if (!examStarted) return
 
@@ -304,22 +345,6 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
 
     return () => clearInterval(checkInactivity)
   }, [examStarted, lastActivity, logViolation])
-
-  useEffect(() => {
-    if (!examStarted) return
-
-    const timer = setInterval(() => {
-      setTimeRemaining((prev) => {
-        if (prev <= 1) {
-          handleEndExam()
-          return 0
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(timer)
-  }, [examStarted])
 
   const handleStartExam = async () => {
     enterFullscreen()
@@ -371,13 +396,6 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
     setTimeout(() => {
       router.push("/")
     }, 2000)
-  }
-
-  const formatTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
   if (showWarning) {
@@ -464,30 +482,24 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         }
       `}</style>
 
-      <div className="bg-red-600 text-white px-4 py-2 flex items-center justify-between">
+      <div className="fixed top-0 left-0 right-0 bg-red-600 text-white px-4 py-2 flex items-center justify-between z-40 h-14">
         <div className="flex items-center gap-2">
           <Eye className="h-4 w-4" />
           <span className="text-sm font-medium">EXAM IN PROGRESS - MONITORED</span>
         </div>
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4" />
-            <span className="font-mono">{formatTime(timeRemaining)}</span>
-          </div>
-          <Button
-            onClick={handleEndExam}
-            variant="outline"
-            size="sm"
-            className="bg-white text-red-600 hover:bg-gray-100"
-          >
-            End Exam
-          </Button>
-        </div>
+        <Button
+          onClick={handleEndExam}
+          variant="outline"
+          size="sm"
+          className="bg-white text-red-600 hover:bg-gray-100"
+        >
+          End Exam
+        </Button>
       </div>
 
-      <div className="p-4">
+      <div className="fixed inset-0 top-14 bg-white overflow-hidden">
         {isBlocked ? (
-          <div className="flex items-center justify-center h-96">
+          <div className="flex items-center justify-center h-full">
             <div className="text-center">
               <AlertTriangle className="h-16 w-16 text-red-500 mx-auto mb-4" />
               <h2 className="text-xl font-bold text-red-600 mb-2">Exam Temporarily Blocked</h2>
@@ -495,14 +507,13 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
             </div>
           </div>
         ) : (
-          <div className="max-w-4xl mx-auto">
-            <iframe
-              src={examData.formUrl}
-              className="w-full h-screen border-0"
-              title="Exam Form"
-              sandbox="allow-forms allow-scripts allow-same-origin"
-            />
-          </div>
+          <iframe
+            ref={iframeRef}
+            src={examData.formUrl}
+            className="w-full h-full border-none"
+            title="Exam Form"
+            sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+          />
         )}
       </div>
     </div>
