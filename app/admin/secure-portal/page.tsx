@@ -611,7 +611,7 @@ export default function AdminPortal() {
             <Button
               variant="outline"
               onClick={handleLogout}
-              className="text-red-600 border-white hover:bg-red-50 bg-transparent"
+              className="text-white-600 border-white hover:bg-red-50 bg-transparent"
             >
               Secure Logout
             </Button>
