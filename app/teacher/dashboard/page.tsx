@@ -1,5 +1,5 @@
 "use client"
-
+export const dynamic = "force-dynamic"; // Add this line!
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -44,12 +44,13 @@ interface Exam {
 
 interface Violation {
   id: string
+  exam_session_id: number | null
   studentName: string
   examTitle: string
   violationType: string
   description: string
+  severity: string
   timestamp: string
-  severity: "low" | "medium" | "high"
 }
 
 interface ExamSession {
@@ -62,6 +63,7 @@ interface ExamSession {
   violation_count: number
   start_time: string
   duration_minutes: number
+  violations?: Violation[]
 }
 
 export default function TeacherDashboard() {
@@ -70,6 +72,13 @@ export default function TeacherDashboard() {
   const [violations, setViolations] = useState<Violation[]>([])
   const [activeSessions, setActiveSessions] = useState<ExamSession[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  
+  // Search and filter states
+  const [violationSearch, setViolationSearch] = useState("")
+  const [monitoringSearch, setMonitoringSearch] = useState("")
+  const [selectedSeverity, setSelectedSeverity] = useState<string>("all")
+  const [selectedViolationType, setSelectedViolationType] = useState<string>("all")
+  const [selectedSession, setSelectedSession] = useState<ExamSession | null>(null)
 
   // Dialog states
   const [showCreateExam, setShowCreateExam] = useState(false)
@@ -200,6 +209,7 @@ export default function TeacherDashboard() {
       if (violationsData.success && violationsData.violations) {
         const formattedViolations = violationsData.violations.map((violation: any) => ({
           id: violation.id.toString(),
+          exam_session_id: violation.exam_session_id,
           studentName: violation.student_name || "Unknown",
           examTitle: violation.exam_title || "Unknown Exam",
           violationType: violation.violation_type || "UNKNOWN",
@@ -424,6 +434,32 @@ export default function TeacherDashboard() {
         return "bg-gray-100 text-gray-800"
     }
   }
+
+  // Filter violations based on search and severity
+  const filteredViolations = violations.filter((violation) => {
+    const matchesSearch = 
+      violation.studentName.toLowerCase().includes(violationSearch.toLowerCase()) ||
+      violation.examTitle.toLowerCase().includes(violationSearch.toLowerCase()) ||
+      violation.description.toLowerCase().includes(violationSearch.toLowerCase()) ||
+      violation.violationType.toLowerCase().includes(violationSearch.toLowerCase())
+    
+    const matchesSeverity = selectedSeverity === "all" || violation.severity === selectedSeverity
+    const matchesType = selectedViolationType === "all" || violation.violationType === selectedViolationType
+    
+    return matchesSearch && matchesSeverity && matchesType
+  })
+
+  // Filter sessions based on search
+  const filteredSessions = activeSessions.filter((session) => {
+    return (
+      session.student_name.toLowerCase().includes(monitoringSearch.toLowerCase()) ||
+      session.student_id.toLowerCase().includes(monitoringSearch.toLowerCase()) ||
+      session.exam_title.toLowerCase().includes(monitoringSearch.toLowerCase())
+    )
+  })
+
+  // Get unique violation types for filter
+  const uniqueViolationTypes = Array.from(new Set(violations.map((v) => v.violationType)))
 
   const getStatusActions = (exam: Exam) => {
     switch (exam.status) {
@@ -675,7 +711,7 @@ export default function TeacherDashboard() {
           <TabsList>
             <TabsTrigger value="exams">My Exams</TabsTrigger>
             <TabsTrigger value="violations">Violations Log</TabsTrigger>
-            <TabsTrigger value="monitoring">Activity log</TabsTrigger>
+            <TabsTrigger value="monitoring">Live Monitoring</TabsTrigger>
           </TabsList>
 
           <TabsContent value="exams" className="space-y-6">
@@ -731,37 +767,115 @@ export default function TeacherDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <AlertTriangle className="h-5 w-5" />
-                  Recent Violations ({violations.length})
+                  Recent Violations ({filteredViolations.length} of {violations.length})
                 </CardTitle>
                 <CardDescription>Detailed log of all detected violations</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {violations.length === 0 ? (
+                <div className="space-y-6">
+                  {/* Search and Filter Controls */}
+                  <div className="space-y-4 pb-4 border-b">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Search violations by student, exam, or description..."
+                        value={violationSearch}
+                        onChange={(e) => setViolationSearch(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setViolationSearch("")
+                          setSelectedSeverity("all")
+                          setSelectedViolationType("all")
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-2 block">Filter by Severity</Label>
+                        <select
+                          value={selectedSeverity}
+                          onChange={(e) => setSelectedSeverity(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="all">All Severities</option>
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                      </div>
+                      
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-2 block">Filter by Type</Label>
+                        <select
+                          value={selectedViolationType}
+                          onChange={(e) => setSelectedViolationType(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="all">All Types</option>
+                          {uniqueViolationTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {type.replace(/_/g, " ")}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Violations List */}
+                  {filteredViolations.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No violations detected yet. Great job maintaining exam integrity!</p>
+                      {violations.length === 0 ? (
+                        <>
+                          <p>No violations detected yet. Great job maintaining exam integrity!</p>
+                        </>
+                      ) : (
+                        <>
+                          <p>No violations match your search or filters.</p>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-4"
+                            onClick={() => {
+                              setViolationSearch("")
+                              setSelectedSeverity("all")
+                              setSelectedViolationType("all")
+                            }}
+                          >
+                            Clear Filters
+                          </Button>
+                        </>
+                      )}
                     </div>
                   ) : (
-                    violations.map((violation) => (
-                      <div key={violation.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50">
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-medium">{violation.studentName}</h3>
-                            <Badge variant="outline" className="bg-red-50 text-red-800 border-red-200 font-mono text-xs">
-                              {violation.violationType.replace(/_/g, " ")}
-                            </Badge>
-                            <Badge className={getSeverityColor(violation.severity)}>{violation.severity.toUpperCase()}</Badge>
-                          </div>
-                          <p className="text-sm text-gray-600 font-medium">{violation.examTitle}</p>
-                          <p className="text-sm text-gray-700">{violation.description}</p>
-                          <div className="flex items-center justify-between pt-2 border-t">
-                            <p className="text-xs text-gray-500">{new Date(violation.timestamp).toLocaleString()}</p>
-                            <span className="text-xs font-mono text-gray-500">ID: {violation.id}</span>
+                    <div className="space-y-4">
+                      {filteredViolations.map((violation) => (
+                        <div key={violation.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                          <div className="space-y-2 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h3 className="font-medium">{violation.studentName}</h3>
+                              <Badge variant="outline" className="bg-red-50 text-red-800 border-red-200 font-mono text-xs">
+                                {violation.violationType.replace(/_/g, " ")}
+                              </Badge>
+                              <Badge className={getSeverityColor(violation.severity)}>{violation.severity.toUpperCase()}</Badge>
+                            </div>
+                            <p className="text-sm text-gray-600 font-medium">{violation.examTitle}</p>
+                            <p className="text-sm text-gray-700">{violation.description}</p>
+                            <div className="flex items-center justify-between pt-2 border-t">
+                              <p className="text-xs text-gray-500">{new Date(violation.timestamp).toLocaleString()}</p>
+                              <span className="text-xs font-mono text-gray-500">ID: {violation.id}</span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))
+                      ))}
+                    </div>
                   )}
                 </div>
               </CardContent>
@@ -773,48 +887,119 @@ export default function TeacherDashboard() {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Activity className="h-5 w-5" />
-                  Live Monitoring ({activeSessions.length})
+                  Live Monitoring ({filteredSessions.length} of {activeSessions.length})
                 </CardTitle>
-                <CardDescription>Real-time monitoring of students currently taking exams</CardDescription>
+                <CardDescription>Real-time monitoring of students currently taking exams - click on a session to view violations</CardDescription>
               </CardHeader>
               <CardContent>
-                {activeSessions.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No active exam sessions at the moment.</p>
-                    <p className="text-sm">Students taking exams will appear here in real-time.</p>
+                <div className="space-y-6">
+                  {/* Search Bar */}
+                  <div className="flex gap-2 pb-4 border-b">
+                    <Input
+                      placeholder="Search by student name, ID, or exam..."
+                      value={monitoringSearch}
+                      onChange={(e) => setMonitoringSearch(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setMonitoringSearch("")}
+                    >
+                      Clear
+                    </Button>
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {activeSessions.map((session) => (
-                      <div
-                        key={session.id}
-                        className="flex items-start justify-between p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-transparent hover:shadow-md transition-shadow"
+
+                  {/* Sessions List */}
+                  {activeSessions.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No active exam sessions at the moment.</p>
+                      <p className="text-sm">Students taking exams will appear here in real-time.</p>
+                    </div>
+                  ) : filteredSessions.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No sessions match your search.</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-4"
+                        onClick={() => setMonitoringSearch("")}
                       >
-                        <div className="space-y-2 flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-medium text-gray-900">{session.student_name}</h3>
-                            <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200">
-                              <span className="w-2 h-2 bg-green-500 rounded-full inline-block mr-1"></span>
-                              Active
-                            </Badge>
-                          </div>
-                          <p className="text-sm text-gray-600">{session.exam_title}</p>
-                          <div className="flex items-center gap-4 text-xs text-gray-500">
-                            <span>Student ID: {session.student_id}</span>
-                            <span>Started: {new Date(session.start_time).toLocaleTimeString()}</span>
-                            {session.violation_count > 0 && (
-                              <Badge className="bg-red-100 text-red-800">
-                                <AlertTriangle className="h-3 w-3 mr-1" />
-                                {session.violation_count} Violation{session.violation_count !== 1 ? "s" : ""}
+                        Clear Search
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {filteredSessions.map((session) => (
+                        <div
+                          key={session.id}
+                          onClick={() => setSelectedSession(selectedSession?.id === session.id ? null : session)}
+                          className="flex items-start justify-between p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-transparent hover:shadow-md transition-all cursor-pointer hover:border-blue-300"
+                        >
+                          <div className="space-y-2 flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-medium text-gray-900">{session.student_name}</h3>
+                              <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200">
+                                <span className="w-2 h-2 bg-green-500 rounded-full inline-block mr-1"></span>
+                                Active
                               </Badge>
-                            )}
+                            </div>
+                            <p className="text-sm text-gray-600">{session.exam_title}</p>
+                            {(() => {
+                              // Calculate violations for this session using session ID
+                              const sessionViolations = violations.filter(
+                                (v) => v.exam_session_id && v.exam_session_id === parseInt(session.id)
+                              )
+                              return (
+                                <>
+                                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                                    <span>Student ID: {session.student_id}</span>
+                                    <span>Started: {new Date(session.start_time).toLocaleTimeString()}</span>
+                                    {sessionViolations.length > 0 && (
+                                      <Badge className="bg-red-100 text-red-800">
+                                        <AlertTriangle className="h-3 w-3 mr-1" />
+                                        {sessionViolations.length} Violation{sessionViolations.length !== 1 ? "s" : ""}
+                                      </Badge>
+                                    )}
+                                  </div>
+
+                                  {/* Expanded Violations View */}
+                                  {selectedSession?.id === session.id && (
+                                    <div className="mt-4 pt-4 border-t space-y-3">
+                                      <h4 className="font-medium text-sm">Violations for this session ({sessionViolations.length}):</h4>
+                                      {sessionViolations.length === 0 ? (
+                                        <p className="text-xs text-gray-500 italic">No violations recorded for this session.</p>
+                                      ) : (
+                                        <div className="space-y-2">
+                                          {sessionViolations.map((violation) => (
+                                            <div key={violation.id} className="bg-white border border-red-100 rounded p-3 space-y-1">
+                                              <div className="flex items-center gap-2">
+                                                <Badge variant="outline" className="bg-red-50 text-red-800 border-red-200 font-mono text-xs">
+                                                  {violation.violationType.replace(/_/g, " ")}
+                                                </Badge>
+                                                <Badge className={getSeverityColor(violation.severity)}>
+                                                  {violation.severity.toUpperCase()}
+                                                </Badge>
+                                              </div>
+                                              <p className="text-xs text-gray-700">{violation.description}</p>
+                                              <p className="text-xs text-gray-500">{new Date(violation.timestamp).toLocaleString()}</p>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </>
+                              )
+                            })()}
                           </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
