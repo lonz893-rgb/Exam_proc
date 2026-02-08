@@ -1,5 +1,5 @@
 "use client"
-
+export const dynamic = "force-dynamic"; // Add this line
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -38,6 +38,8 @@ interface Student {
   email: string
   student_id: string
   status: "active" | "suspended"
+  teacher_id?: string
+  teacher_name?: string
   created_at: string
 }
 
@@ -52,11 +54,11 @@ interface Teacher {
 
 interface SystemLog {
   id: string
-  log_type: string // This maps to 'action' in DB
-  user_type: "student" | "teacher" | "admin" | "system"
-  message: string  // This maps to 'description' in DB
-  timestamp: string // This maps to 'created_at' in DB
-  severity: "low" | "medium" | "high"
+  log_type: string     // Maps to 'action' in your DB
+  user_type: string    // Maps to 'user_type' in your DB
+  message: string      // Maps to 'description' in your DB
+  timestamp: string    // Maps to 'timestamp' in your DB
+  severity: string     // Maps to 'severity' in your DB
 }
 
 interface Admin {
@@ -76,6 +78,12 @@ export default function AdminPortal() {
   const [teachers, setTeachers] = useState<Teacher[]>([])
   const [systemLogs, setSystemLogs] = useState<SystemLog[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  
+  // System logs search and filter states
+  const [logSearch, setLogSearch] = useState("")
+  const [selectedLogType, setSelectedLogType] = useState<string>("all")
+  const [selectedUserType, setSelectedUserType] = useState<string>("all")
+  const [selectedSeverity, setSelectedSeverity] = useState<string>("all")
 
   // Dialog states
   const [showAddStudent, setShowAddStudent] = useState(false)
@@ -495,6 +503,20 @@ export default function AdminPortal() {
     }
   }
 
+  // Filter system logs based on search and filters
+  const filteredSystemLogs = systemLogs.filter((log) => {
+    const matchesSearch = log.message.toLowerCase().includes(logSearch.toLowerCase())
+    const matchesLogType = selectedLogType === "all" || log.log_type === selectedLogType
+    const matchesUserType = selectedUserType === "all" || log.user_type === selectedUserType
+    const matchesSeverity = selectedSeverity === "all" || log.severity === selectedSeverity
+
+    return matchesSearch && matchesLogType && matchesUserType && matchesSeverity
+  })
+
+  // Get unique log types and user types for filters
+  const uniqueLogTypes = Array.from(new Set(systemLogs.map((log) => log.log_type)))
+  const uniqueUserTypes = Array.from(new Set(systemLogs.map((log) => log.user_type)))
+
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -589,7 +611,7 @@ export default function AdminPortal() {
             <Button
               variant="outline"
               onClick={handleLogout}
-              className="text-white-600 border-white hover:bg-red-50 bg-transparent"
+              className="text-red-600 border-white hover:bg-red-50 bg-transparent"
             >
               Secure Logout
             </Button>
@@ -1052,31 +1074,125 @@ export default function AdminPortal() {
           <TabsContent value="system" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>System Activity Logs</CardTitle>
-                <CardDescription>Real-time audit trail of all system actions</CardDescription>
+                <CardTitle>System Activity Logs ({filteredSystemLogs.length} of {systemLogs.length})</CardTitle>
+                <CardDescription>Monitor system events and security alerts</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-6">
+                  {/* Search and Filter Controls */}
+                  <div className="space-y-4 pb-4 border-b">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Search logs by message..."
+                        value={logSearch}
+                        onChange={(e) => setLogSearch(e.target.value)}
+                        className="flex-1"
+                      />
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setLogSearch("")
+                          setSelectedLogType("all")
+                          setSelectedUserType("all")
+                          setSelectedSeverity("all")
+                        }}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-2 block">Filter by Log Type</Label>
+                        <select
+                          value={selectedLogType}
+                          onChange={(e) => setSelectedLogType(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="all">All Types</option>
+                          {uniqueLogTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {type.charAt(0).toUpperCase() + type.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-2 block">Filter by User Type</Label>
+                        <select
+                          value={selectedUserType}
+                          onChange={(e) => setSelectedUserType(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="all">All Users</option>
+                          {uniqueUserTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {type.charAt(0).toUpperCase() + type.slice(1)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <Label className="text-xs text-gray-600 mb-2 block">Filter by Severity</Label>
+                        <select
+                          value={selectedSeverity}
+                          onChange={(e) => setSelectedSeverity(e.target.value)}
+                          className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                          <option value="all">All Severities</option>
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Logs Display */}
                   {systemLogs.length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No activity logs found.</p>
+                      <p>No system logs found.</p>
+                    </div>
+                  ) : filteredSystemLogs.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Database className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>No logs match your search or filters.</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="mt-4"
+                        onClick={() => {
+                          setLogSearch("")
+                          setSelectedLogType("all")
+                          setSelectedUserType("all")
+                          setSelectedSeverity("all")
+                        }}
+                      >
+                        Clear Filters
+                      </Button>
                     </div>
                   ) : (
-                    systemLogs.map((log) => (
-                      <div key={log.id} className="flex items-start justify-between p-4 border rounded-lg bg-white shadow-sm">
+                    <div className="space-y-4">
+                      {filteredSystemLogs.map((log) => (
+                      <div key={log.id} className="flex items-start justify-between p-4 border rounded-lg">
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="capitalize">{log.user_type}</Badge>
-                            <Badge className={getSeverityColor(log.severity)}>{log.log_type}</Badge>
+                            <Badge variant="outline">{log.log_type}</Badge>
+                            <Badge variant="outline">{log.user_type}</Badge>
                           </div>
-                          <p className="text-sm font-medium text-gray-900">{log.message}</p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(log.timestamp).toLocaleString()}
-                          </p>
+                          <p className="text-sm">{log.message}</p>
+                        </div>
+
+                        <div className="text-right text-sm text-gray-600">
+                          <p>{new Date(log.timestamp).toLocaleString()}</p>
                         </div>
                       </div>
-                    ))
+                    ))}
+                    </div>
                   )}
                 </div>
               </CardContent>
