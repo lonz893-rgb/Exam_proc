@@ -197,60 +197,10 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
 
       if (!isCurrentlyFullscreen && examStarted) {
         logViolation("FULLSCREEN_EXIT", "Student exited fullscreen mode during exam")
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
         // Force fullscreen re-entry after a short delay
         setTimeout(() => {
           enterFullscreen()
         }, 500)
-=======
-        // Immediately try to re-enter fullscreen
-        enterFullscreen()
->>>>>>> Stashed changes
-=======
-        // Immediately try to re-enter fullscreen
-        enterFullscreen()
->>>>>>> Stashed changes
-=======
-        // Immediately try to re-enter fullscreen
-        enterFullscreen()
->>>>>>> Stashed changes
-=======
-        // Immediately try to re-enter fullscreen
-        enterFullscreen()
->>>>>>> Stashed changes
-=======
-        // Immediately try to re-enter fullscreen
-        enterFullscreen()
->>>>>>> Stashed changes
-=======
-        // Immediately try to re-enter fullscreen
-        enterFullscreen()
->>>>>>> Stashed changes
-=======
-        // Immediately try to re-enter fullscreen
-        enterFullscreen()
->>>>>>> Stashed changes
-=======
-        // Immediately try to re-enter fullscreen
-        enterFullscreen()
->>>>>>> Stashed changes
-=======
-        // Immediately try to re-enter fullscreen
-        enterFullscreen()
->>>>>>> Stashed changes
-=======
-        // Immediately try to re-enter fullscreen
-        enterFullscreen()
->>>>>>> Stashed changes
       }
     }
 
@@ -455,16 +405,12 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
     }
   }, [examStarted, logViolation, updateActivity, isBlocked, enterFullscreen, verifyViolationIntegrity])
 
-  // Continuous fullscreen enforcement
-=======
-  // Continuous fullscreen enforcement - check every 500ms for faster response
->>>>>>> Stashed changes
+
   useEffect(() => {
     if (!examStarted) return
 
     const enforceFullscreen = setInterval(() => {
       const isCurrentlyFullscreen = !!document.fullscreenElement
-<<<<<<< Updated upstream
       if (!isCurrentlyFullscreen) {
         console.log("[v0] Fullscreen lost, forcing re-entry...")
         enterFullscreen()
@@ -475,64 +421,13 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
   }, [examStarted, enterFullscreen])
 
   // Inactivity monitoring
-=======
-=======
-
-=======
-
->>>>>>> Stashed changes
-=======
-
->>>>>>> Stashed changes
-=======
-
->>>>>>> Stashed changes
-=======
-
->>>>>>> Stashed changes
-=======
-
->>>>>>> Stashed changes
-=======
-
->>>>>>> Stashed changes
-=======
-
->>>>>>> Stashed changes
-=======
-
->>>>>>> Stashed changes
   // Continuous fullscreen enforcement - check every 500ms for faster response
   useEffect(() => {
     if (!examStarted) return
 
     const enforceFullscreen = setInterval(() => {
       const isCurrentlyFullscreen = !!document.fullscreenElement
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+
       if (!isCurrentlyFullscreen && !isBlocked) {
         // Only try to re-enter if not currently showing a violation warning
         console.log("[v0] Fullscreen lost, attempting re-entry...")
@@ -561,34 +456,7 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
   }, [examStarted])
 
   // Inactivity monitoring (keep this)
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+
   useEffect(() => {
     if (!examStarted) return
 
@@ -744,37 +612,9 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
         }
       `}</style>
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
+
       {/* Proctoring Header - Minimal */}
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+
       <div className="fixed top-0 left-0 right-0 bg-red-600 text-white px-4 py-2 flex items-center justify-between z-40 h-14">
         <div className="flex items-center gap-2">
           <Eye className="h-4 w-4" />
@@ -790,37 +630,9 @@ export default function ExamPage({ params }: { params: { examId: string } }) {
         </Button>
       </div>
 
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
+
       {/* Exam Content - Full Screen */}
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
+
       <div className="fixed inset-0 top-14 bg-white overflow-hidden">
         {isBlocked ? (
           <div className="flex items-center justify-center h-full">
