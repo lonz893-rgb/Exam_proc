@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
           timestamp
         FROM violations
         ORDER BY timestamp DESC
-        LIMIT 100
+        LIMIT 200
       `
       
       const results = (await executeQuery(query, [])) as any[]
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       WHERE e.teacher_id = ?
          OR v.exam_session_id IS NULL
       ORDER BY v.timestamp DESC
-      LIMIT 100
+      LIMIT 200
     `
 
     let results = (await executeQuery(query, [teacherId])) as any[]
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
           timestamp
         FROM violations
         ORDER BY timestamp DESC
-        LIMIT 100
+        LIMIT 200
       `
       
       results = (await executeQuery(query, [])) as any[]
