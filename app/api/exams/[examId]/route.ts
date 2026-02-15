@@ -1,10 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { executeQuery } from "@/lib/db"
 
-export async function PATCH(request: NextRequest, { params }: { params: { examId: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ examId: string }> }) {
   try {
     const { status } = await request.json()
-    const { examId } = params
+    const unwrappedParams = await params
+    const { examId } = unwrappedParams
 
     if (!status || !examId) {
       return NextResponse.json({ success: false, message: "Status and exam ID are required" }, { status: 400 })
