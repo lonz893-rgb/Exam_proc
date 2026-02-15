@@ -1,11 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { executeQuery } from "@/lib/db"
-import { use } from "react";
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ studentId: string }> }) {
   try {
-    const unwrappedParams = use(params);
-    const studentId = unwrappedParams.studentId;
+    const { studentId } = await params;
     console.log("Updating student:", studentId)
     const { name, email, student_id, status } = await request.json()
 
@@ -29,7 +27,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       success: true,
       message: "Student updated successfully",
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error updating student:", error)
     return NextResponse.json(
       { success: false, message: "Failed to update student", error: error.message },
@@ -38,12 +36,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { studentId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ studentId: string }> }) {
   try {
-    console.log("Deleting student:", params.studentId)
+    const { studentId } = await params;
+    console.log("Deleting student:", studentId)
 
     const query = "DELETE FROM students WHERE id = ?"
-    const result = await executeQuery(query, [params.studentId])
+    const result = await executeQuery(query, [studentId])
 
     if (result.affectedRows === 0) {
       return NextResponse.json({ success: false, message: "Student not found" }, { status: 404 })
@@ -54,7 +53,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { stude
       success: true,
       message: "Student deleted successfully",
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error deleting student:", error)
     return NextResponse.json(
       { success: false, message: "Failed to delete student", error: error.message },
