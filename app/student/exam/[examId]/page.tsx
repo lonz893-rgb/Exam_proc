@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card"
 import { AlertTriangle, Shield, Clock, Eye } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-export const dynamic = "force-dynamic";
 import { use } from "react";
 
 interface Violation {
