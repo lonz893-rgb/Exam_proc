@@ -1,5 +1,5 @@
 "use client"
-
+export const dynamic = "force-dynamic";
 import { useRef, useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -119,7 +119,7 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          violationType: type,
+          violation_type: type,
           description: description,
           examId: examId,
           examSessionId: sessionId ? parseInt(sessionId) : null,
@@ -377,7 +377,7 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            violationType: "VIOLATION_TAMPERING",
+            violation_type: "VIOLATION_TAMPERING",
             description: `Violation log tampering detected. Expected ${integrity.storedChecksum} violations but found ${integrity.currentChecksum}`,
             examId: examId,
             examSessionId: sessionId ? parseInt(sessionId) : null,
