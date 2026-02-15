@@ -1,9 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { executeQuery } from "@/lib/db"
 
-export async function PUT(request: NextRequest, { params }: { params: { teacherId: string } }) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ teacherId: string }> }) {
   try {
-    console.log("Updating teacher:", params.teacherId)
+    const unwrappedParams = await params
+    const { teacherId } = unwrappedParams
+    console.log("Updating teacher:", teacherId)
     const { name, email, department, status } = await request.json()
 
     if (!name || !email || !department) {
@@ -15,7 +17,7 @@ export async function PUT(request: NextRequest, { params }: { params: { teacherI
       SET name = ?, email = ?, department = ?, status = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `
-    const result = await executeQuery(query, [name, email, department, status, params.teacherId])
+    const result = await executeQuery(query, [name, email, department, status, teacherId])
 
     if (result.affectedRows === 0) {
       return NextResponse.json({ success: false, message: "Teacher not found" }, { status: 404 })
@@ -35,12 +37,14 @@ export async function PUT(request: NextRequest, { params }: { params: { teacherI
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { teacherId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ teacherId: string }> }) {
   try {
-    console.log("Deleting teacher:", params.teacherId)
+    const unwrappedParams = await params
+    const { teacherId } = unwrappedParams
+    console.log("Deleting teacher:", teacherId)
 
     const query = "DELETE FROM teachers WHERE id = ?"
-    const result = await executeQuery(query, [params.teacherId])
+    const result = await executeQuery(query, [teacherId])
 
     if (result.affectedRows === 0) {
       return NextResponse.json({ success: false, message: "Teacher not found" }, { status: 404 })
