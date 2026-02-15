@@ -118,7 +118,7 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          violationType: type,
+          violation_type: type,
           description: description,
           examId: examId,
           examSessionId: sessionId ? parseInt(sessionId) : null,
