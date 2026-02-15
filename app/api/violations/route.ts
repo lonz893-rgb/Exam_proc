@@ -131,9 +131,11 @@ export async function POST(request: NextRequest) {
     const currentTimestamp = timestamp || new Date().toISOString()
 
     const query = `
-      INSERT INTO violations (exam_session_id, student_name, exam_title, violation_type, description, severity, timestamp)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `
+  INSERT INTO violations (
+    exam_session_id, student_name, exam_title, 
+    violation_type, description, severity, timestamp
+  ) VALUES (?, ?, ?, ?, ?, ?, NOW()) -- Use NOW() instead of the passed variable
+  `;
 
     console.log("[v0] Logging violation:", {
       sessionId,
