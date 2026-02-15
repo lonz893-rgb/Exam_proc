@@ -212,7 +212,7 @@ export default function TeacherDashboard() {
           student_name: violation.student_name || "Unknown",
           examTitle: violation.exam_title || "Unknown Exam",
           exam_title: violation.exam_title || "Unknown Exam",
-          violationType: violation.violationType || "UNKNOWN",
+          violationType: violation.violation_type || "UNKNOWN",
           description: violation.description || "",
           timestamp: violation.timestamp,
           severity: violation.severity || "medium",
