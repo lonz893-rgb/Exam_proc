@@ -214,8 +214,7 @@ export default function TeacherDashboard() {
           examTitle: violation.exam_title || "Unknown Exam",
           violationType: violation.violation_type || "UNKNOWN",
           description: violation.description || "",
-          // Inside pollLiveData mapping:
-          timestamp: new Date(violation.timestamp).toLocaleString(),
+          timestamp: violation.timestamp,
           severity: violation.severity || "medium",
         }))
         console.log("[v0] Formatted violations:", formattedViolations)

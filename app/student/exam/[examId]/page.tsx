@@ -1,12 +1,11 @@
 "use client"
-export const dynamic = "force-dynamic";
+
 import { useRef, useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertTriangle, Shield, Clock, Eye } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { use } from "react";
 
 interface Violation {
   type: string
@@ -14,9 +13,7 @@ interface Violation {
   description: string
 }
 
-export default function ExamPage({ params }: { params: Promise<{ examId: string }> }) {
-  const unwrappedParams = use(params);
-  const examId = unwrappedParams.examId;
+export default function ExamPage({ params }: { params: { examId: string } }) {
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [examStarted, setExamStarted] = useState(false)
   const [violations, setViolations] = useState<Violation[]>([])
@@ -85,74 +82,68 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
   }, [violations.length])
 
   const logViolation = useCallback(
-  (type: string, description: string) => {
-    const violation: Violation = {
-      type,
-      timestamp: new Date().toISOString(),
-      description,
-    }
-
-    // 1. INTEGRITY CHECK
-    const integrity = verifyViolationIntegrity()
-    if (integrity.tampered) {
-      console.error("[v0] Violation log tampering detected!")
-      const tamperingViolation: Violation = {
-        type: "VIOLATION_TAMPERING",
+    (type: string, description: string) => {
+      const violation: Violation = {
+        type,
         timestamp: new Date().toISOString(),
-        description: `Tampering detected. Expected ${integrity.storedChecksum}, found ${integrity.currentChecksum}`,
+        description,
       }
-      setViolations((prev) => [...prev, tamperingViolation])
-    }
 
-    // 2. UPDATE LOCAL STATE
-    setViolations((prev) => {
-      const newViolations = [...prev, violation];
-      // Store checksum using the fresh state value
-      localStorage.setItem("examViolationsChecksum", newViolations.length.toString());
-      return newViolations;
-    });
+      // Check for tampering before logging
+      const integrity = verifyViolationIntegrity()
+      if (integrity.tampered) {
+        console.error("[v0] Violation log tampering detected before new violation!")
+        // Log the tampering itself as a violation
+        const tamperingViolation: Violation = {
+          type: "VIOLATION_TAMPERING",
+          timestamp: new Date().toISOString(),
+          description: `Violation log tampering detected. Expected ${integrity.storedChecksum} violations but found ${integrity.currentChecksum}`,
+        }
+        setViolations((prev) => [...prev, tamperingViolation])
+      }
 
-    // 3. PREPARE DATA FROM STORAGE
-    const studentData = localStorage.getItem("studentData")
-    const student = studentData ? JSON.parse(studentData) : null
-    const sessionId = localStorage.getItem("examSessionId")
+      setViolations((prev) => [...prev, violation])
 
-    // 4. SEND TO BACKEND
-    fetch("/api/violations", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        violationType: type,            // FIXED: matched route.ts (removed the _)
+      // Store checksum for next verification
+      localStorage.setItem("examViolationsChecksum", violations.length.toString())
+
+      const studentData = localStorage.getItem("studentData")
+      const student = studentData ? JSON.parse(studentData) : null
+      const sessionId = localStorage.getItem("examSessionId")
+
+      fetch("/api/violations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          violationType: type,
+          description: description,
+          examId: params.examId,
+          examSessionId: sessionId ? parseInt(sessionId) : null,
+          timestamp: new Date().toISOString(),
+          studentName: student?.name || "Unknown Student",
+          examTitle: examData?.title || "Unknown Exam",
+        }),
+      }).catch((error) => console.log("[v0] Failed to log violation:", error))
+
+      console.log("[v0] Violation logged:", violation)
+
+      setWarningMessage(description)
+      setShowWarning(true)
+      setIsBlocked(true)
+
+      setTimeout(() => {
+        setShowWarning(false)
+        setIsBlocked(false)
+      }, 10000)
+
+      toast({
+        title: "Violation Detected",
         description: description,
-        examId: examId,
-        examSessionId: sessionId ? parseInt(sessionId) : null,
-        timestamp: new Date().toISOString(),
-        studentName: student?.name || "Unknown Student",
-        examTitle: examData?.title || "Unknown Exam",
-      }),
-    })
-    .then(res => res.json())
-    .then(data => console.log("[v0] Server Response:", data))
-    .catch((error) => console.error("[v0] Network error logging violation:", error))
-
-    // 5. UI FEEDBACK
-    setWarningMessage(description)
-    setShowWarning(true)
-    setIsBlocked(true)
-
-    setTimeout(() => {
-      setShowWarning(false)
-      setIsBlocked(false)
-    }, 10000)
-
-    toast({
-      title: "Violation Detected",
-      description: description,
-      variant: "destructive",
-    })
-  },
-  [toast, examId, examData, violations.length] // Added violations.length for integrity accuracy
-)
+        variant: "destructive",
+      })
+    },
+    [toast, params.examId, examData],
+  )
 
   // Detect external scripts from public/scripts directory
   const detectExternalScripts = useCallback(() => {
@@ -206,10 +197,60 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
 
       if (!isCurrentlyFullscreen && examStarted) {
         logViolation("FULLSCREEN_EXIT", "Student exited fullscreen mode during exam")
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
         // Force fullscreen re-entry after a short delay
         setTimeout(() => {
           enterFullscreen()
         }, 500)
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
       }
     }
 
@@ -382,9 +423,9 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            violation_type: "VIOLATION_TAMPERING",
+            violationType: "VIOLATION_TAMPERING",
             description: `Violation log tampering detected. Expected ${integrity.storedChecksum} violations but found ${integrity.currentChecksum}`,
-            examId: examId,
+            examId: params.examId,
             examSessionId: sessionId ? parseInt(sessionId) : null,
             timestamp: new Date().toISOString(),
             studentName: student?.name || "Unknown Student",
@@ -414,12 +455,16 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
     }
   }, [examStarted, logViolation, updateActivity, isBlocked, enterFullscreen, verifyViolationIntegrity])
 
-
+  // Continuous fullscreen enforcement
+=======
+  // Continuous fullscreen enforcement - check every 500ms for faster response
+>>>>>>> Stashed changes
   useEffect(() => {
     if (!examStarted) return
 
     const enforceFullscreen = setInterval(() => {
       const isCurrentlyFullscreen = !!document.fullscreenElement
+<<<<<<< Updated upstream
       if (!isCurrentlyFullscreen) {
         console.log("[v0] Fullscreen lost, forcing re-entry...")
         enterFullscreen()
@@ -430,13 +475,64 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
   }, [examStarted, enterFullscreen])
 
   // Inactivity monitoring
+=======
+=======
+
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
   // Continuous fullscreen enforcement - check every 500ms for faster response
   useEffect(() => {
     if (!examStarted) return
 
     const enforceFullscreen = setInterval(() => {
       const isCurrentlyFullscreen = !!document.fullscreenElement
-
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
       if (!isCurrentlyFullscreen && !isBlocked) {
         // Only try to re-enter if not currently showing a violation warning
         console.log("[v0] Fullscreen lost, attempting re-entry...")
@@ -465,7 +561,34 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
   }, [examStarted])
 
   // Inactivity monitoring (keep this)
-
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
   useEffect(() => {
     if (!examStarted) return
 
@@ -499,10 +622,10 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            examId: examId,
+            examId: params.examId,
             studentId: student.id,
             studentName: student.name,
-            sessionToken: `${examId}-${student.id}-${Date.now()}`,
+            sessionToken: `${params.examId}-${student.id}-${Date.now()}`,
           }),
         })
 
@@ -621,9 +744,37 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         }
       `}</style>
 
-
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
       {/* Proctoring Header - Minimal */}
-
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
       <div className="fixed top-0 left-0 right-0 bg-red-600 text-white px-4 py-2 flex items-center justify-between z-40 h-14">
         <div className="flex items-center gap-2">
           <Eye className="h-4 w-4" />
@@ -639,9 +790,37 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         </Button>
       </div>
 
-
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
       {/* Exam Content - Full Screen */}
-
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
       <div className="fixed inset-0 top-14 bg-white overflow-hidden">
         {isBlocked ? (
           <div className="flex items-center justify-center h-full">

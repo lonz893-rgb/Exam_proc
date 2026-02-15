@@ -1,11 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { executeQuery } from "@/lib/db"
 
-export async function PATCH(request: NextRequest, { params }: { params: Promise<{ examId: string }> }) {
+export async function PATCH(request: NextRequest, { params }: { params: { examId: string } }) {
   try {
     const { status } = await request.json()
-    const unwrappedParams = await params
-    const { examId } = unwrappedParams
+    const { examId } = params
 
     if (!status || !examId) {
       return NextResponse.json({ success: false, message: "Status and exam ID are required" }, { status: 400 })
@@ -44,10 +43,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ examId: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: { examId: string } }) {
   try {
-    const unwrappedParams = await params
-    const { examId } = unwrappedParams
+    const { examId } = params
 
     if (!examId) {
       return NextResponse.json({ success: false, message: "Exam ID is required" }, { status: 400 })

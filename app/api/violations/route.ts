@@ -128,16 +128,12 @@ export async function POST(request: NextRequest) {
     const title = examTitle || "Unknown Exam"
     const student = studentName || "Unknown Student"
     const severity_level = severity || "medium"
-    const rawTimestamp = timestamp || new Date().toISOString();
-    // Convert '2026-01-27T14:29:10.414Z' to '2026-01-27 14:29:10'
-    const currentTimestamp = rawTimestamp.replace('T', ' ').split('.')[0];
+    const currentTimestamp = timestamp || new Date().toISOString()
 
     const query = `
-  INSERT INTO violations (
-    exam_session_id, student_name, exam_title, 
-    violation_type, description, severity, timestamp
-  ) VALUES (?, ?, ?, ?, ?, ?, ?)
-  `;
+      INSERT INTO violations (exam_session_id, student_name, exam_title, violation_type, description, severity, timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `
 
     console.log("[v0] Logging violation:", {
       sessionId,

@@ -1,12 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { executeQuery } from "@/lib/db"
-import { use } from "react";
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ teacherId: string }> }) {
+export async function PUT(request: NextRequest, { params }: { params: { teacherId: string } }) {
   try {
-    const unwrappedParams = use(params);
-    const teacherId = unwrappedParams.teacherId;
-    console.log("Updating teacher:", teacherId)
+    console.log("Updating teacher:", params.teacherId)
     const { name, email, department, status } = await request.json()
 
     if (!name || !email || !department) {
@@ -18,7 +15,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       SET name = ?, email = ?, department = ?, status = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
     `
-    const result = await executeQuery(query, [name, email, department, status, teacherId])
+    const result = await executeQuery(query, [name, email, department, status, params.teacherId])
 
     if (result.affectedRows === 0) {
       return NextResponse.json({ success: false, message: "Teacher not found" }, { status: 404 })
