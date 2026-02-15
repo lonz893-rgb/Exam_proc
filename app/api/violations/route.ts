@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
           exam_session_id, 
           student_name, 
           exam_title, 
-          violation_type, 
+          violationType, 
           description, 
           severity, 
           timestamp
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
         v.exam_session_id, 
         v.student_name, 
         v.exam_title, 
-        v.violation_type, 
+        v.violationType, 
         v.description, 
         v.severity, 
         v.timestamp
@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
           exam_session_id, 
           student_name, 
           exam_title, 
-          violation_type, 
+          violationType, 
           description, 
           severity, 
           timestamp
@@ -131,7 +131,7 @@ export async function POST(request: NextRequest) {
     const currentTimestamp = timestamp || new Date().toISOString()
 
     const query = `
-      INSERT INTO violations (exam_session_id, student_name, exam_title, violation_type, description, severity, timestamp)
+      INSERT INTO violations (exam_session_id, student_name, exam_title, violationType, description, severity, timestamp)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `
 
