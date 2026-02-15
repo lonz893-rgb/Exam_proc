@@ -1,5 +1,5 @@
 "use client"
-
+export const dynamic = "force-dynamic"; // Add this line
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -54,11 +54,11 @@ interface Teacher {
 
 interface SystemLog {
   id: string
-  log_type: "login" | "violation" | "system" | "error"
-  user_type: "student" | "teacher" | "admin" | "system"
-  message: string
-  timestamp: string
-  severity: "low" | "medium" | "high"
+  log_type: string     // Maps to 'action' in your DB
+  user_type: string    // Maps to 'user_type' in your DB
+  message: string      // Maps to 'description' in your DB
+  timestamp: string    // Maps to 'timestamp' in your DB
+  severity: string     // Maps to 'severity' in your DB
 }
 
 interface Admin {
