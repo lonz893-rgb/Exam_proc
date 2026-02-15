@@ -85,68 +85,74 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
   }, [violations.length])
 
   const logViolation = useCallback(
-    (type: string, description: string) => {
-      const violation: Violation = {
-        type,
+  (type: string, description: string) => {
+    const violation: Violation = {
+      type,
+      timestamp: new Date().toISOString(),
+      description,
+    }
+
+    // 1. INTEGRITY CHECK
+    const integrity = verifyViolationIntegrity()
+    if (integrity.tampered) {
+      console.error("[v0] Violation log tampering detected!")
+      const tamperingViolation: Violation = {
+        type: "VIOLATION_TAMPERING",
         timestamp: new Date().toISOString(),
-        description,
+        description: `Tampering detected. Expected ${integrity.storedChecksum}, found ${integrity.currentChecksum}`,
       }
+      setViolations((prev) => [...prev, tamperingViolation])
+    }
 
-      // Check for tampering before logging
-      const integrity = verifyViolationIntegrity()
-      if (integrity.tampered) {
-        console.error("[v0] Violation log tampering detected before new violation!")
-        // Log the tampering itself as a violation
-        const tamperingViolation: Violation = {
-          type: "VIOLATION_TAMPERING",
-          timestamp: new Date().toISOString(),
-          description: `Violation log tampering detected. Expected ${integrity.storedChecksum} violations but found ${integrity.currentChecksum}`,
-        }
-        setViolations((prev) => [...prev, tamperingViolation])
-      }
+    // 2. UPDATE LOCAL STATE
+    setViolations((prev) => {
+      const newViolations = [...prev, violation];
+      // Store checksum using the fresh state value
+      localStorage.setItem("examViolationsChecksum", newViolations.length.toString());
+      return newViolations;
+    });
 
-      setViolations((prev) => [...prev, violation])
+    // 3. PREPARE DATA FROM STORAGE
+    const studentData = localStorage.getItem("studentData")
+    const student = studentData ? JSON.parse(studentData) : null
+    const sessionId = localStorage.getItem("examSessionId")
 
-      // Store checksum for next verification
-      localStorage.setItem("examViolationsChecksum", violations.length.toString())
-
-      const studentData = localStorage.getItem("studentData")
-      const student = studentData ? JSON.parse(studentData) : null
-      const sessionId = localStorage.getItem("examSessionId")
-
-      fetch("/api/violations", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          violation_type: type,
-          description: description,
-          examId: examId,
-          examSessionId: sessionId ? parseInt(sessionId) : null,
-          timestamp: new Date().toISOString(),
-          studentName: student?.name || "Unknown Student",
-          examTitle: examData?.title || "Unknown Exam",
-        }),
-      }).catch((error) => console.log("[v0] Failed to log violation:", error))
-
-      console.log("[v0] Violation logged:", violation)
-
-      setWarningMessage(description)
-      setShowWarning(true)
-      setIsBlocked(true)
-
-      setTimeout(() => {
-        setShowWarning(false)
-        setIsBlocked(false)
-      }, 10000)
-
-      toast({
-        title: "Violation Detected",
+    // 4. SEND TO BACKEND
+    fetch("/api/violations", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        violationType: type,            // FIXED: matched route.ts (removed the _)
         description: description,
-        variant: "destructive",
-      })
-    },
-    [toast, examId, examData],
-  )
+        examId: examId,
+        examSessionId: sessionId ? parseInt(sessionId) : null,
+        timestamp: new Date().toISOString(),
+        studentName: student?.name || "Unknown Student",
+        examTitle: examData?.title || "Unknown Exam",
+      }),
+    })
+    .then(res => res.json())
+    .then(data => console.log("[v0] Server Response:", data))
+    .catch((error) => console.error("[v0] Network error logging violation:", error))
+
+    // 5. UI FEEDBACK
+    setWarningMessage(description)
+    setShowWarning(true)
+    setIsBlocked(true)
+
+    setTimeout(() => {
+      setShowWarning(false)
+      setIsBlocked(false)
+    }, 10000)
+
+    toast({
+      title: "Violation Detected",
+      description: description,
+      variant: "destructive",
+    })
+  },
+  [toast, examId, examData, violations.length] // Added violations.length for integrity accuracy
+)
 
   // Detect external scripts from public/scripts directory
   const detectExternalScripts = useCallback(() => {

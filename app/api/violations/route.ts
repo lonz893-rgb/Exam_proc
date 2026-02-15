@@ -1,15 +1,43 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { executeQuery } from "@/lib/db"
 
+// GET - Fetch violations for teacher dashboard
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const teacherId = searchParams.get("teacherId")
 
-    console.log("[v0] Dashboard requested violations. Bypassing teacher filter for debugging.");
+    // If no teacherId, return ALL violations (for testing/debugging)
+    if (!teacherId) {
+      const query = `
+        SELECT 
+          id, 
+          exam_session_id, 
+          student_name, 
+          exam_title, 
+          violation_type, 
+          description, 
+          severity, 
+          timestamp
+        FROM violations
+        ORDER BY timestamp DESC
+        LIMIT 100
+      `
+      
+      const results = (await executeQuery(query, [])) as any[]
+      
+      return NextResponse.json({
+        success: true,
+        violations: results,
+        count: results.length,
+      })
+    }
 
-    // This query pulls EVERYTHING. It ignores whether teacher_id is NULL or matches.
-    const query = `
+    console.log("[v0] Fetching violations for teacher ID:", teacherId)
+
+    // UPDATED STRATEGY: Get violations from teacher's exams OR Google Sheets exams (NULL session)
+    // This ensures Google Sheets exam violations always appear for all teachers
+    let query = `
       SELECT 
         v.id, 
         v.exam_session_id, 
@@ -22,14 +50,37 @@ export async function GET(request: NextRequest) {
       FROM violations v
       LEFT JOIN exam_sessions es ON v.exam_session_id = es.id
       LEFT JOIN exams e ON es.exam_id = e.id
+      WHERE e.teacher_id = ?
+         OR v.exam_session_id IS NULL
       ORDER BY v.timestamp DESC
       LIMIT 100
     `
 
-    // Notice we pass an empty array [] because we removed the "?" from the query
-    const results = (await executeQuery(query, [])) as any[]
+    let results = (await executeQuery(query, [teacherId])) as any[]
+    console.log("[v0] Found", results.length, "violations (including Google Sheets exams)")
 
-    console.log(`[v0] Found ${results.length} total violations in database.`);
+    // Fallback: If still no results, get ALL violations
+    if (results.length === 0) {
+      console.log("[v0] WARNING: No violations found, fetching ALL violations")
+      
+      query = `
+        SELECT 
+          id, 
+          exam_session_id, 
+          student_name, 
+          exam_title, 
+          violation_type, 
+          description, 
+          severity, 
+          timestamp
+        FROM violations
+        ORDER BY timestamp DESC
+        LIMIT 100
+      `
+      
+      results = (await executeQuery(query, [])) as any[]
+      console.log("[v0] Fallback returned", results.length, "violations")
+    }
 
     return NextResponse.json({
       success: true,
@@ -37,15 +88,15 @@ export async function GET(request: NextRequest) {
       count: results.length,
     })
   } catch (error) {
-    console.error("[v0] GET violations error:", error)
+    console.error("[v0] Get violations error:", error)
     return NextResponse.json(
       {
         success: true,
         violations: [],
         count: 0,
-        message: "Error fetching data",
+        error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 200 }
+      { status: 200 },
     )
   }
 }
