@@ -44,9 +44,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { examId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ examId: string }> }) {
   try {
-    const { examId } = params
+    const unwrappedParams = await params
+    const { examId } = unwrappedParams
 
     if (!examId) {
       return NextResponse.json({ success: false, message: "Exam ID is required" }, { status: 400 })
