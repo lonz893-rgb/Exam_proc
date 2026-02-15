@@ -1,12 +1,11 @@
 "use client"
-export const dynamic = "force-dynamic";
+
 import { useRef, useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertTriangle, Shield, Clock, Eye } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useToast } from "@/hooks/use-toast"
-import { use } from "react";
 
 interface Violation {
   type: string
@@ -14,10 +13,8 @@ interface Violation {
   description: string
 }
 
-export default function ExamPage({ params }: { params: Promise<{ examId: string }> }) {
-  const unwrappedParams = use(params);
-  const examId = unwrappedParams.examId;
-  const [isFullscreen, setIsFullscreen] = useState(false) 
+export default function ExamPage({ params }: { params: { examId: string } }) {
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const [examStarted, setExamStarted] = useState(false)
   const [violations, setViolations] = useState<Violation[]>([])
   const [isBlocked, setIsBlocked] = useState(false)
@@ -51,6 +48,39 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
     }
   }, [])
 
+  // Detect if violations array has been tampered with
+  const detectViolationTampering = useCallback(
+    (previousCount: number, currentCount: number) => {
+      // If violations were deleted, that's tampering
+      if (currentCount < previousCount) {
+        return true
+      }
+      return false
+    },
+    []
+  )
+
+  // Verify violation integrity
+  const verifyViolationIntegrity = useCallback(() => {
+    try {
+      const stored = localStorage.getItem("examViolationsChecksum")
+      const currentChecksum = violations.length.toString()
+      
+      if (stored && stored !== currentChecksum) {
+        console.warn("[v0] Violation tampering detected!")
+        return {
+          tampered: true,
+          storedChecksum: stored,
+          currentChecksum: currentChecksum,
+        }
+      }
+      return { tampered: false }
+    } catch (error) {
+      console.error("[v0] Error verifying violation integrity:", error)
+      return { tampered: false }
+    }
+  }, [violations.length])
+
   const logViolation = useCallback(
     (type: string, description: string) => {
       const violation: Violation = {
@@ -59,7 +89,23 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         description,
       }
 
+      // Check for tampering before logging
+      const integrity = verifyViolationIntegrity()
+      if (integrity.tampered) {
+        console.error("[v0] Violation log tampering detected before new violation!")
+        // Log the tampering itself as a violation
+        const tamperingViolation: Violation = {
+          type: "VIOLATION_TAMPERING",
+          timestamp: new Date().toISOString(),
+          description: `Violation log tampering detected. Expected ${integrity.storedChecksum} violations but found ${integrity.currentChecksum}`,
+        }
+        setViolations((prev) => [...prev, tamperingViolation])
+      }
+
       setViolations((prev) => [...prev, violation])
+
+      // Store checksum for next verification
+      localStorage.setItem("examViolationsChecksum", violations.length.toString())
 
       const studentData = localStorage.getItem("studentData")
       const student = studentData ? JSON.parse(studentData) : null
@@ -71,7 +117,7 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         body: JSON.stringify({
           violationType: type,
           description: description,
-          examId: examId,
+          examId: params.examId,
           examSessionId: sessionId ? parseInt(sessionId) : null,
           timestamp: new Date().toISOString(),
           studentName: student?.name || "Unknown Student",
@@ -96,8 +142,29 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         variant: "destructive",
       })
     },
-    [toast, examId, examData],
+    [toast, params.examId, examData],
   )
+
+  // Detect external scripts from public/scripts directory
+  const detectExternalScripts = useCallback(() => {
+    try {
+      const scripts = document.querySelectorAll('script[src]')
+      const publicScriptPattern = /public\/scripts\//i
+      const detectedScripts: string[] = []
+      
+      scripts.forEach((script) => {
+        const src = script.getAttribute('src') || ''
+        if (publicScriptPattern.test(src)) {
+          detectedScripts.push(src)
+        }
+      })
+      
+      return detectedScripts
+    } catch (error) {
+      console.error('[v0] Error detecting external scripts:', error)
+      return []
+    }
+  }, [])
 
   const enterFullscreen = useCallback(() => {
     const elem = document.documentElement
@@ -130,8 +197,60 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
 
       if (!isCurrentlyFullscreen && examStarted) {
         logViolation("FULLSCREEN_EXIT", "Student exited fullscreen mode during exam")
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+        // Force fullscreen re-entry after a short delay
+        setTimeout(() => {
+          enterFullscreen()
+        }, 500)
+=======
         // Immediately try to re-enter fullscreen
         enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
+=======
+        // Immediately try to re-enter fullscreen
+        enterFullscreen()
+>>>>>>> Stashed changes
       }
     }
 
@@ -281,7 +400,44 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
     document.addEventListener("cut", handleCut, true)
     window.addEventListener("contextmenu", handleContextMenu, true)
 
+    // Periodic external script detection
+    const scriptMonitorInterval = setInterval(() => {
+      const externalScripts = detectExternalScripts()
+      if (externalScripts.length > 0) {
+        console.log("[v0] External scripts detected during exam:", externalScripts)
+        logViolation("EXTERNAL_SCRIPT", `External script loaded during exam: ${externalScripts.join(', ')}`)
+      }
+    }, 15000) // Check every 15 seconds
+
+    // Periodic violation integrity check
+    const integrityCheckInterval = setInterval(() => {
+      const integrity = verifyViolationIntegrity()
+      if (integrity.tampered) {
+        console.error("[v0] Violation tampering detected during periodic check!")
+        // Directly create and send a tampering violation
+        const studentData = localStorage.getItem("studentData")
+        const student = studentData ? JSON.parse(studentData) : null
+        const sessionId = localStorage.getItem("examSessionId")
+        
+        fetch("/api/violations", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            violationType: "VIOLATION_TAMPERING",
+            description: `Violation log tampering detected. Expected ${integrity.storedChecksum} violations but found ${integrity.currentChecksum}`,
+            examId: params.examId,
+            examSessionId: sessionId ? parseInt(sessionId) : null,
+            timestamp: new Date().toISOString(),
+            studentName: student?.name || "Unknown Student",
+            examTitle: examData?.title || "Unknown Exam",
+          }),
+        }).catch((error) => console.log("[v0] Failed to log tampering violation:", error))
+      }
+    }, 20000) // Check every 20 seconds
+
     return () => {
+      clearInterval(scriptMonitorInterval)
+      clearInterval(integrityCheckInterval)
       document.removeEventListener("fullscreenchange", handleFullscreenChange)
       document.removeEventListener("visibilitychange", handleVisibilityChange)
       document.removeEventListener("keydown", handleKeyDown, true)
@@ -297,14 +453,86 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
       document.removeEventListener("cut", handleCut, true)
       window.removeEventListener("contextmenu", handleContextMenu, true)
     }
-  }, [examStarted, logViolation, updateActivity, isBlocked, enterFullscreen])
+  }, [examStarted, logViolation, updateActivity, isBlocked, enterFullscreen, verifyViolationIntegrity])
 
+  // Continuous fullscreen enforcement
+=======
+  // Continuous fullscreen enforcement - check every 500ms for faster response
+>>>>>>> Stashed changes
+  useEffect(() => {
+    if (!examStarted) return
+
+    const enforceFullscreen = setInterval(() => {
+      const isCurrentlyFullscreen = !!document.fullscreenElement
+<<<<<<< Updated upstream
+      if (!isCurrentlyFullscreen) {
+        console.log("[v0] Fullscreen lost, forcing re-entry...")
+        enterFullscreen()
+      }
+    }, 1000) // Check every second
+
+    return () => clearInterval(enforceFullscreen)
+  }, [examStarted, enterFullscreen])
+
+  // Inactivity monitoring
+=======
+=======
+
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
+=======
+
+>>>>>>> Stashed changes
   // Continuous fullscreen enforcement - check every 500ms for faster response
   useEffect(() => {
     if (!examStarted) return
 
     const enforceFullscreen = setInterval(() => {
       const isCurrentlyFullscreen = !!document.fullscreenElement
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
       if (!isCurrentlyFullscreen && !isBlocked) {
         // Only try to re-enter if not currently showing a violation warning
         console.log("[v0] Fullscreen lost, attempting re-entry...")
@@ -333,6 +561,34 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
   }, [examStarted])
 
   // Inactivity monitoring (keep this)
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
   useEffect(() => {
     if (!examStarted) return
 
@@ -347,6 +603,12 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
   }, [examStarted, lastActivity, logViolation])
 
   const handleStartExam = async () => {
+    // Check for external scripts at exam start
+    const externalScripts = detectExternalScripts()
+    if (externalScripts.length > 0) {
+      logViolation("EXTERNAL_SCRIPT", `External script detected at exam start: ${externalScripts.join(', ')}`)
+    }
+
     enterFullscreen()
     setExamStarted(true)
     updateActivity()
@@ -360,10 +622,10 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            examId: examId,
+            examId: params.examId,
             studentId: student.id,
             studentName: student.name,
-            sessionToken: `${examId}-${student.id}-${Date.now()}`,
+            sessionToken: `${params.examId}-${student.id}-${Date.now()}`,
           }),
         })
 
@@ -482,6 +744,37 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         }
       `}</style>
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+      {/* Proctoring Header - Minimal */}
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
       <div className="fixed top-0 left-0 right-0 bg-red-600 text-white px-4 py-2 flex items-center justify-between z-40 h-14">
         <div className="flex items-center gap-2">
           <Eye className="h-4 w-4" />
@@ -497,6 +790,37 @@ export default function ExamPage({ params }: { params: Promise<{ examId: string 
         </Button>
       </div>
 
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+<<<<<<< Updated upstream
+      {/* Exam Content - Full Screen */}
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
+=======
+>>>>>>> Stashed changes
       <div className="fixed inset-0 top-14 bg-white overflow-hidden">
         {isBlocked ? (
           <div className="flex items-center justify-center h-full">

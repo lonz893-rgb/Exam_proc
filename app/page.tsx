@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,6 +22,7 @@ export default function HomePage() {
   const router = useRouter()
   const { toast } = useToast()
 
+  // PHASE 1: Verify Student ID
   const handleStudentLogin = async () => {
     if (!studentId.trim()) {
       toast({
@@ -36,36 +36,39 @@ export default function HomePage() {
     setIsLoading(true)
 
     try {
+      // Sending ONLY studentId to trigger Phase 1 in the backend
       const response = await fetch("/api/auth/student", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ studentId }),
       })
 
       const data = await response.json()
 
       if (data.success) {
+        // Store student data and open the second verification step
         localStorage.setItem("userRole", "student")
-        localStorage.setItem("studentData", JSON.stringify(data.student))
+        if (data.student) {
+          localStorage.setItem("studentData", JSON.stringify(data.student))
+        }
+        
         setShowFormIdModal(true)
         toast({
-          title: "Success",
-          description: `Welcome ${data.student.name}!`,
+          title: "ID Verified",
+          description: data.student ? `Welcome ${data.student.name}!` : "Please enter your Exam Form ID.",
         })
       } else {
         toast({
-          title: "Error",
-          description: data.message || "Student not found",
+          title: "Verification Failed",
+          description: data.message || "Student ID not found.",
           variant: "destructive",
         })
       }
     } catch (error) {
-      console.error("Student login error:", error)
+      console.error("Student verification error:", error)
       toast({
-        title: "Error",
-        description: "Connection error. Please check if the server is running.",
+        title: "Connection Error",
+        description: "Could not reach the server. Please check your database settings.",
         variant: "destructive",
       })
     } finally {
@@ -73,6 +76,7 @@ export default function HomePage() {
     }
   }
 
+  // PHASE 2: Verify Unique Form ID
   const handleFormIdSubmit = async () => {
     if (!uniqueFormId.trim()) {
       toast({
@@ -86,35 +90,35 @@ export default function HomePage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch(`/api/exams/by-unique-id?uniqueId=${uniqueFormId.toUpperCase()}`)
+      // Sending BOTH IDs to trigger Phase 2 in the backend
+      const response = await fetch("/api/auth/student", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId, uniqueFormId }),
+      })
+
       const data = await response.json()
 
-      if (data.success && data.exam) {
-        const exam = data.exam
-
-        if (exam.status !== "active") {
-          toast({
-            title: "Exam Not Available",
-            description: "This exam is not currently active",
-            variant: "destructive",
-          })
-          return
-        }
-
-        localStorage.setItem("currentExam", JSON.stringify(exam))
-        router.push(`/student/exam/${exam.id}`)
+      if (response.ok && data.success) {
+        toast({
+          title: "Access Granted",
+          description: "Form ID verified. Redirecting to exam...",
+        })
+        
+        // Final Redirect to the proctoring interface (index.html in public folder)
+        window.location.href = "/index.html" 
       } else {
         toast({
-          title: "Invalid Form ID",
-          description: "The Unique Form ID you entered is not valid or the exam is not active",
+          title: "Access Denied",
+          description: data.message || "Invalid Unique Form ID",
           variant: "destructive",
         })
       }
     } catch (error) {
-      console.error("Form ID error:", error)
+      console.error("Form ID submission error:", error)
       toast({
         title: "Error",
-        description: "Connection error. Please try again.",
+        description: "An unexpected error occurred. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -123,60 +127,30 @@ export default function HomePage() {
   }
 
   const handleTeacherLogin = async (e?: React.FormEvent) => {
-    if (e) {
-      e.preventDefault()
-    }
-
+    if (e) e.preventDefault()
     if (!teacherEmail.trim() || !teacherPassword.trim()) {
-      toast({
-        title: "Error",
-        description: "Please enter both email and password",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Please enter both credentials", variant: "destructive" })
       return
     }
 
     setIsLoading(true)
-
     try {
-      console.log("Attempting teacher login with:", { email: teacherEmail })
-
       const response = await fetch("/api/auth/teacher", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: teacherEmail, password: teacherPassword }),
       })
 
-      console.log("Teacher login response status:", response.status)
       const data = await response.json()
-      console.log("Teacher login response data:", data)
-
       if (data.success) {
         localStorage.setItem("userRole", "teacher")
         localStorage.setItem("teacherData", JSON.stringify(data.teacher))
-
-        toast({
-          title: "Success",
-          description: `Welcome ${data.teacher.name}!`,
-        })
-
         router.push("/teacher/dashboard")
       } else {
-        toast({
-          title: "Error",
-          description: data.message || "Invalid credentials",
-          variant: "destructive",
-        })
+        toast({ title: "Error", description: data.message || "Invalid credentials", variant: "destructive" })
       }
     } catch (error) {
-      console.error("Teacher login error:", error)
-      toast({
-        title: "Error",
-        description: "Connection error. Please check if the server is running.",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Connection error.", variant: "destructive" })
     } finally {
       setIsLoading(false)
     }
@@ -184,7 +158,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -197,52 +170,40 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        {/* Hero Section */}
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold text-gray-900 mb-4">Welcome to IT Proctool</h2>
-          <p className="text-xl text-gray-600 mb-8">
-            Advanced online exam monitoring with real-time cheating detection
-          </p>
+          <p className="text-xl text-gray-600 mb-8">Advanced exam monitoring with real-time detection</p>
 
-          {/* Features */}
           <div className="grid md:grid-cols-3 gap-6 mb-12">
             <div className="bg-white p-6 rounded-lg shadow-md">
               <Eye className="h-12 w-12 text-blue-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Real-time Monitoring</h3>
-              <p className="text-gray-600">Advanced detection of suspicious behavior during exams</p>
+              <h3 className="text-lg font-semibold mb-2">Monitoring</h3>
+              <p className="text-gray-600">Suspicious behavior detection</p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-md">
               <Shield className="h-12 w-12 text-green-600 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold mb-2">Secure Environment</h3>
-              <p className="text-gray-600">Fullscreen enforcement and tab switching prevention</p>
+              <h3 className="text-lg font-semibold mb-2">Secure</h3>
+              <p className="text-gray-600">Tab switching prevention</p>
             </div>
             <div className="bg-white p-6 rounded-lg shadow-md">
               <Users className="h-12 w-12 text-purple-600 mx-auto mb-4" />
               <h3 className="text-lg font-semibold mb-2">Direct Access</h3>
-              <p className="text-gray-600">Enter unique form IDs to access exams directly</p>
+              <p className="text-gray-600">Access via Unique Form IDs</p>
             </div>
           </div>
         </div>
 
-        {/* Login Section */}
-        <Card className="max-w-md mx-auto">
+        <Card className="max-w-md mx-auto shadow-xl">
           <CardHeader>
-            <CardTitle className="text-center">Access Portal</CardTitle>
-            <CardDescription className="text-center">Choose your role to continue</CardDescription>
+            <CardTitle className="text-center text-2xl font-bold">Access Portal</CardTitle>
+            <CardDescription className="text-center text-lg">Choose your role</CardDescription>
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="student" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="student" className="flex items-center gap-2">
-                  <GraduationCap className="h-4 w-4" />
-                  Student
-                </TabsTrigger>
-                <TabsTrigger value="teacher" className="flex items-center gap-2">
-                  <Users className="h-4 w-4" />
-                  Teacher
-                </TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="student" className="gap-2"><GraduationCap className="h-4 w-4" /> Student</TabsTrigger>
+                <TabsTrigger value="teacher" className="gap-2"><Users className="h-4 w-4" /> Teacher</TabsTrigger>
               </TabsList>
 
               <TabsContent value="student" className="space-y-4">
@@ -255,9 +216,10 @@ export default function HomePage() {
                     onChange={(e) => setStudentId(e.target.value)}
                     onKeyPress={(e) => e.key === "Enter" && handleStudentLogin()}
                     disabled={isLoading}
+                    className="h-12"
                   />
                 </div>
-                <Button onClick={handleStudentLogin} className="w-full" disabled={isLoading}>
+                <Button onClick={handleStudentLogin} className="w-full h-12 text-lg font-semibold" disabled={isLoading}>
                   {isLoading ? "Verifying..." : "Continue to Form Access"}
                 </Button>
               </TabsContent>
@@ -273,7 +235,7 @@ export default function HomePage() {
                       value={teacherEmail}
                       onChange={(e) => setTeacherEmail(e.target.value)}
                       disabled={isLoading}
-                      required
+                      className="h-12"
                     />
                   </div>
                   <div className="space-y-2">
@@ -285,18 +247,10 @@ export default function HomePage() {
                       value={teacherPassword}
                       onChange={(e) => setTeacherPassword(e.target.value)}
                       disabled={isLoading}
-                      required
+                      className="h-12"
                     />
                   </div>
-                  <Button
-                    type="submit"
-                    className="w-full"
-                    disabled={isLoading}
-                    onClick={(e) => {
-                      e.preventDefault()
-                      handleTeacherLogin()
-                    }}
-                  >
+                  <Button type="submit" className="w-full h-12 text-lg font-semibold" disabled={isLoading}>
                     {isLoading ? "Authenticating..." : "Access Dashboard"}
                   </Button>
                 </form>
@@ -304,57 +258,45 @@ export default function HomePage() {
             </Tabs>
           </CardContent>
         </Card>
-
-        {/* Demo Credentials */}
-        <div className="mt-8 text-center text-sm text-gray-600">
-          <p className="mb-2">
-            <strong>Demo Credentials:</strong>
-          </p>
-          <p>Student ID: STU001, STU002, or STU003</p>
-          <p>Teacher: teacher@cec.edu / teacher123</p>
-          <p>Admin: admin@itproctool.edu / SecureAdmin2024!</p>
-        </div>
       </main>
 
       {/* Unique Form ID Modal */}
       <Dialog open={showFormIdModal} onOpenChange={setShowFormIdModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md p-8">
           <DialogHeader>
-            <DialogTitle className="text-center text-xl">Enter Unique Form ID</DialogTitle>
-            <DialogDescription className="text-center">
-              Enter the Unique Form ID provided by your teacher to access the exam
+            <DialogTitle className="text-center text-2xl font-bold">Exam Verification</DialogTitle>
+            <DialogDescription className="text-center text-base">
+              Enter the Unique Form ID provided by your teacher.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-4">
+          <div className="space-y-6 py-4">
             <div className="space-y-2">
-              <Label htmlFor="uniqueFormId" className="text-base font-medium">
-                Unique Form ID
-              </Label>
+              <Label htmlFor="uniqueFormId" className="text-lg font-medium">Unique Form ID</Label>
               <Input
                 id="uniqueFormId"
                 placeholder="e.g., MATH2024001"
                 value={uniqueFormId}
                 onChange={(e) => setUniqueFormId(e.target.value.toUpperCase())}
                 onKeyPress={(e) => e.key === "Enter" && handleFormIdSubmit()}
-                className="text-center text-lg"
+                className="text-center text-xl h-14 font-mono tracking-widest"
                 disabled={isLoading}
               />
             </div>
-            <Button onClick={handleFormIdSubmit} className="w-full" size="lg" disabled={isLoading}>
-              {isLoading ? "Verifying..." : "Access Exam"}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowFormIdModal(false)
-                setStudentId("")
-                setUniqueFormId("")
-              }}
-              className="w-full"
-              disabled={isLoading}
-            >
-              Cancel
-            </Button>
+            <div className="flex flex-col gap-3">
+              <Button onClick={handleFormIdSubmit} className="w-full h-12 text-lg font-semibold" disabled={isLoading}>
+                {isLoading ? "Checking ID..." : "Start Exam"}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => {
+                  setShowFormIdModal(false)
+                  setUniqueFormId("")
+                }}
+                disabled={isLoading}
+              >
+                Back
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

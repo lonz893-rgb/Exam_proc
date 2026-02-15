@@ -1,13 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { executeQuery } from "@/lib/db"
 
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ teacherId: string }> }) {
+export async function PUT(request: NextRequest, { params }: { params: { teacherId: string } }) {
   try {
-    const { teacherId } = await params;
-    console.log("Updating teacher:", teacherId)
-    const body = await request.json();
-    const { name, email, department, status } = body;
-    
+    console.log("Updating teacher:", params.teacherId)
+    const { name, email, department, status } = await request.json()
 
     if (!name || !email || !department) {
       return NextResponse.json({ success: false, message: "Name, email, and department are required" }, { status: 400 })
@@ -17,9 +14,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       UPDATE teachers 
       SET name = ?, email = ?, department = ?, status = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `;
-    
-    const result = await executeQuery(query, [name, email, department, status, teacherId])
+    `
+    const result = await executeQuery(query, [name, email, department, status, params.teacherId])
 
     if (result.affectedRows === 0) {
       return NextResponse.json({ success: false, message: "Teacher not found" }, { status: 404 })
@@ -33,19 +29,18 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   } catch (error) {
     console.error("Error updating teacher:", error)
     return NextResponse.json(
-      { success: false, message: "Failed to update teacher", error: error instanceof Error ? error.message : "Unknown error" },
+      { success: false, message: "Failed to update teacher", error: error.message },
       { status: 500 },
     )
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: Promise<{ teacherId: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: { teacherId: string } }) {
   try {
-    const { teacherId } = await params;
-    console.log("Deleting teacher:", teacherId)
+    console.log("Deleting teacher:", params.teacherId)
 
     const query = "DELETE FROM teachers WHERE id = ?"
-    const result = await executeQuery(query, [teacherId])
+    const result = await executeQuery(query, [params.teacherId])
 
     if (result.affectedRows === 0) {
       return NextResponse.json({ success: false, message: "Teacher not found" }, { status: 404 })
@@ -59,7 +54,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   } catch (error) {
     console.error("Error deleting teacher:", error)
     return NextResponse.json(
-      { success: false, message: "Failed to delete teacher", error: error instanceof Error ? error.message : "Unknown error" },
+      { success: false, message: "Failed to delete teacher", error: error.message },
       { status: 500 },
     )
   }
