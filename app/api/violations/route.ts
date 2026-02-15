@@ -134,7 +134,7 @@ export async function POST(request: NextRequest) {
   INSERT INTO violations (
     exam_session_id, student_name, exam_title, 
     violation_type, description, severity, timestamp
-  ) VALUES (?, ?, ?, ?, ?, ?, NOW()) -- Use NOW() instead of the passed variable
+  ) VALUES (?, ?, ?, ?, ?, ?, ?)
   `;
 
     console.log("[v0] Logging violation:", {
