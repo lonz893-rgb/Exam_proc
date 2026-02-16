@@ -3,7 +3,7 @@
 // Fallback API URL (kept for backwards-compatibility)
 const FALLBACK_ANSWER_API_URL = "https://script.google.com/macros/s/AKfycby6B9OgDmMNJqGmDNBvF7MJnAaV1wXTnvmzjjCEqn8vIh1zEFx7Izn3jxEJIsvnuXF4/exec";
 // Next.js API URL for violation logging to dashboard
-const NEXTJS_API_URL = window.NEXTJS_API_URL || 'http://localhost:3000';
+const NEXTJS_API_URL = window.NEXTJS_API_URL || '';
 
 /* ========== FULLSCREEN HELPERS ========== */
 function requestFullscreen() {
@@ -1105,7 +1105,7 @@ async function logViolationToSheet(violationType, violationCount) {
     
     const nextJsApiUrl = NEXTJS_API_URL 
       ? `${NEXTJS_API_URL}/api/violations`
-      : 'http://localhost:3000/api/violations';
+      : '/api/violations';
     
     fetch(nextJsApiUrl, {
       method: 'POST',
