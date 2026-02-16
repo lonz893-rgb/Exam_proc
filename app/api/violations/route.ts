@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { executeQuery } from "@/lib/db"
+export const dynamic = "force-dynamic"; // This ensures we always get fresh data and don't cache results, which is crucial for real-time violation logging and fetching.
+export const revalidate = 0; // No caching - always fetch fresh data for the teacher dashboard and Google Sheets exam logging
 
 // GET - Fetch violations for teacher dashboard
 export async function GET(request: NextRequest) {

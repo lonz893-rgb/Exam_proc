@@ -201,7 +201,13 @@ export default function TeacherDashboard() {
       console.log("[v0] Polling live data for teacher:", teacherId)
       
       // Load violations
-      const violationsResponse = await fetch(`/api/violations?teacherId=${teacherId}`)
+      const violationsResponse = await fetch(`/api/violations?teacherId=${teacherId}`, { 
+        cache: 'no-store', // This is critical for Railway!
+        headers: {
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache'
+        }
+      }); // Add no-cache headers to ensure we get fresh data every time, especially on platforms like Railway that aggressively cache responses.
       const violationsData = await violationsResponse.json()
 
       console.log("[v0] Violations response:", violationsData)
