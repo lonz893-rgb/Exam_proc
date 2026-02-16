@@ -72,7 +72,6 @@ export default function TeacherDashboard() {
   const [violations, setViolations] = useState<Violation[]>([])
   const [activeSessions, setActiveSessions] = useState<ExamSession[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [isRefreshing, setIsRefreshing] = useState(false)
   
   // Search and filter states
   const [violationSearch, setViolationSearch] = useState("")
@@ -128,13 +127,13 @@ export default function TeacherDashboard() {
     }
   }, [showCreateExam])
 
-  // Optional: Poll for live updates every 3 seconds for real-time monitoring
+  // Optional: Poll for live updates every 10 seconds (only when on monitoring tab)
   useEffect(() => {
     if (!teacherData?.id) return
 
     const pollInterval = setInterval(() => {
       pollLiveData(teacherData.id)
-    }, 3000) // Poll every 3 seconds for faster updates
+    }, 10000) // Poll every 10 seconds
 
     return () => clearInterval(pollInterval)
   }, [teacherData?.id])
@@ -199,14 +198,10 @@ export default function TeacherDashboard() {
 
   const pollLiveData = async (teacherId: number) => {
     try {
-      setIsRefreshing(true)
       console.log("[v0] Polling live data for teacher:", teacherId)
       
-      // Add cache-busting timestamp to prevent stale data
-      const timestamp = Date.now()
-      
       // Load violations
-      const violationsResponse = await fetch(`/api/violations?teacherId=${teacherId}&_t=${timestamp}`)
+      const violationsResponse = await fetch(`/api/violations?teacherId=${teacherId}`)
       const violationsData = await violationsResponse.json()
 
       console.log("[v0] Violations response:", violationsData)
@@ -222,7 +217,7 @@ export default function TeacherDashboard() {
           timestamp: violation.timestamp,
           severity: violation.severity || "medium",
         }))
-        console.log("[v0] Formatted violations:", formattedViolations.length, "violations")
+        console.log("[v0] Formatted violations:", formattedViolations)
         setViolations(formattedViolations)
 
         // Update stats
@@ -236,10 +231,10 @@ export default function TeacherDashboard() {
       }
 
       // Load active exam sessions
-      const sessionsResponse = await fetch(`/api/exam-sessions?teacherId=${teacherId}&_t=${timestamp}`)
+      const sessionsResponse = await fetch(`/api/exam-sessions?teacherId=${teacherId}`)
       const sessionsData = await sessionsResponse.json()
 
-      console.log("[v0] Sessions response:", sessionsData.sessions?.length || 0, "sessions")
+      console.log("[v0] Sessions response:", sessionsData)
 
       if (sessionsData.success && sessionsData.sessions) {
         setActiveSessions(sessionsData.sessions || [])
@@ -248,8 +243,6 @@ export default function TeacherDashboard() {
       }
     } catch (error) {
       console.error("[v0] Error polling live data:", error)
-    } finally {
-      setIsRefreshing(false)
     }
   }
 
@@ -772,25 +765,11 @@ export default function TeacherDashboard() {
           <TabsContent value="violations" className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5" />
-                      Recent Violations ({filteredViolations.length} of {violations.length})
-                    </CardTitle>
-                    <CardDescription>Detailed log of all detected violations</CardDescription>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => teacherData && pollLiveData(teacherData.id)}
-                    disabled={isRefreshing}
-                    className="flex items-center gap-2"
-                  >
-                    <Activity className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
-                  </Button>
-                </div>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Recent Violations ({filteredViolations.length} of {violations.length})
+                </CardTitle>
+                <CardDescription>Detailed log of all detected violations</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
@@ -906,25 +885,11 @@ export default function TeacherDashboard() {
           <TabsContent value="monitoring" className="space-y-6">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Activity className="h-5 w-5" />
-                      Live Monitoring ({filteredSessions.length} of {activeSessions.length})
-                    </CardTitle>
-                    <CardDescription>Real-time monitoring of students currently taking exams - click on a session to view violations</CardDescription>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => teacherData && pollLiveData(teacherData.id)}
-                    disabled={isRefreshing}
-                    className="flex items-center gap-2"
-                  >
-                    <Activity className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
-                  </Button>
-                </div>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Live Monitoring ({filteredSessions.length} of {activeSessions.length})
+                </CardTitle>
+                <CardDescription>Real-time monitoring of students currently taking exams - click on a session to view violations</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
