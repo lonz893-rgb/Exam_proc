@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    console.log("[v0] Fetching violations for teacher ID:", teacherId)
+    // console.log("[v0] Fetching violations for teacher ID:", teacherId)
 
     // UPDATED STRATEGY: Get violations from teacher's exams OR Google Sheets exams (NULL session)
     // This ensures Google Sheets exam violations always appear for all teachers
@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     `
 
     let results = (await executeQuery(query, [teacherId])) as any[]
-    console.log("[v0] Found", results.length, "violations (including Google Sheets exams)")
+    // console.log("[v0] Found", results.length, "violations (including Google Sheets exams)")
 
     // Fallback: If still no results, get ALL violations
     if (results.length === 0) {
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       `
       
       results = (await executeQuery(query, [])) as any[]
-      console.log("[v0] Fallback returned", results.length, "violations")
+      // console.log("[v0] Fallback returned", results.length, "violations")
     }
 
     return NextResponse.json({
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
       count: results.length,
     })
   } catch (error) {
-    console.error("[v0] Get violations error:", error)
+    // console.error("[v0] Get violations error:", error)
     return NextResponse.json(
       {
         success: true,
