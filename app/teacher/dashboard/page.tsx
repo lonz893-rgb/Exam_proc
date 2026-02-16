@@ -201,13 +201,7 @@ export default function TeacherDashboard() {
       console.log("[v0] Polling live data for teacher:", teacherId)
       
       // Load violations
-      const violationsResponse = await fetch(`/api/violations?teacherId=${teacherId}`, { 
-        cache: 'no-store', // This is critical for Railway!
-        headers: {
-          'Pragma': 'no-cache',
-          'Cache-Control': 'no-cache'
-        }
-      }); // Add no-cache headers to ensure we get fresh data every time, especially on platforms like Railway that aggressively cache responses.
+      const violationsResponse = await fetch(`/api/violations?teacherId=${teacherId}`)
       const violationsData = await violationsResponse.json()
 
       console.log("[v0] Violations response:", violationsData)
@@ -955,13 +949,9 @@ export default function TeacherDashboard() {
                             <p className="text-sm text-gray-600">{session.exam_title}</p>
                             {(() => {
                               // Calculate violations for this session using session ID
-                              const sessionViolations = violations.filter((v) => {
-                                // If it's a real session, match by ID
-                                if (v.exam_session_id && v.exam_session_id === parseInt(session.id)) return true;
-                                // If it's a Google Sheets session (no ID), match by name and exam title
-                                if (!v.exam_session_id && v.studentName === session.student_name && v.examTitle === session.exam_title) return true;
-                                return false;
-                              })
+                              const sessionViolations = violations.filter(
+                                (v) => v.exam_session_id && v.exam_session_id === parseInt(session.id)
+                              )
                               return (
                                 <>
                                   <div className="flex items-center gap-4 text-xs text-gray-500">

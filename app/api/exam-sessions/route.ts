@@ -12,10 +12,7 @@ export async function GET(request: NextRequest) {
 
     console.log("[v0] Fetching active exam sessions for teacher:", teacherId)
 
-    // ============================================
-    // PART 1: Get Real Next.js Exam Sessions
-    // ============================================
-    const sessionsQuery = `
+    const query = `
       SELECT 
         es.id,
         es.exam_id,
@@ -27,64 +24,23 @@ export async function GET(request: NextRequest) {
         es.status,
         es.ip_address,
         es.user_agent,
-        0 as is_google_sheets,
         (SELECT COUNT(*) FROM violations WHERE exam_session_id = es.id) as violation_count
       FROM exam_sessions es
       JOIN exams e ON es.exam_id = e.id
       JOIN students s ON es.student_id = s.id
       WHERE e.teacher_id = ? AND es.status = 'active'
       ORDER BY es.start_time DESC
+      LIMIT 100
     `
 
-    const realSessions = (await executeQuery(sessionsQuery, [teacherId])) as any[]
-    console.log("[v0] Found", realSessions.length, "real Next.js sessions")
+    const results = (await executeQuery(query, [teacherId])) as any[]
 
-    // ============================================
-    // PART 2: Get Google Sheets "Pseudo-Sessions" from Violations
-    // ============================================
-    // Group Google Sheets violations by student+exam to create "sessions"
-    const googleSheetsQuery = `
-      SELECT 
-        CONCAT('GS_', v.student_name, '_', v.exam_title) as id,
-        NULL as exam_id,
-        REPLACE(v.exam_title, ' Exam', '') as exam_title,
-        60 as duration_minutes,
-        v.student_name,
-        CONCAT('GS_', v.student_name) as student_id,
-        MIN(v.timestamp) as start_time,
-        'active' as status,
-        NULL as ip_address,
-        NULL as user_agent,
-        1 as is_google_sheets,
-        COUNT(*) as violation_count
-      FROM violations v
-      WHERE v.exam_session_id IS NULL
-        AND v.timestamp > DATE_SUB(NOW(), INTERVAL 24 HOUR)
-      GROUP BY v.student_name, v.exam_title
-      ORDER BY MIN(v.timestamp) DESC
-    `
-
-    const googleSheetsSessions = (await executeQuery(googleSheetsQuery, [])) as any[]
-    console.log("[v0] Found", googleSheetsSessions.length, "Google Sheets pseudo-sessions")
-
-    // ============================================
-    // PART 3: Combine Both Types
-    // ============================================
-    const allSessions = [...realSessions, ...googleSheetsSessions]
-    
-    // Sort by start_time descending (most recent first)
-    allSessions.sort((a, b) => {
-      const timeA = new Date(a.start_time).getTime()
-      const timeB = new Date(b.start_time).getTime()
-      return timeB - timeA
-    })
-
-    console.log("[v0] Total sessions (Next.js + Google Sheets):", allSessions.length)
+    console.log("[v0] Found", results.length, "active exam sessions")
 
     return NextResponse.json({
       success: true,
-      sessions: allSessions,
-      count: allSessions.length,
+      sessions: results,
+      count: results.length,
     })
   } catch (error) {
     console.error("[v0] Get exam sessions error:", error)
