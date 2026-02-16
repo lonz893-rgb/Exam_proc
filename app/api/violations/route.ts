@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
       SELECT 
         v.id, 
         v.exam_session_id, 
-        v.student_name, 
-        v.exam_title, 
+        v.student_name as studentName, 
+        v.exam_title as examTitle,     
         v.violation_type as violationType,
         v.description, 
         v.severity, 

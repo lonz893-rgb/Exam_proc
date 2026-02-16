@@ -949,9 +949,13 @@ export default function TeacherDashboard() {
                             <p className="text-sm text-gray-600">{session.exam_title}</p>
                             {(() => {
                               // Calculate violations for this session using session ID
-                              const sessionViolations = violations.filter(
-                                (v) => v.exam_session_id && v.exam_session_id === parseInt(session.id)
-                              )
+                              const sessionViolations = violations.filter((v) => {
+                                // If it's a real session, match by ID
+                                if (v.exam_session_id && v.exam_session_id === parseInt(session.id)) return true;
+                                // If it's a Google Sheets session (no ID), match by name and exam title
+                                if (!v.exam_session_id && v.studentName === session.student_name && v.examTitle === session.exam_title) return true;
+                                return false;
+                              })
                               return (
                                 <>
                                   <div className="flex items-center gap-4 text-xs text-gray-500">
