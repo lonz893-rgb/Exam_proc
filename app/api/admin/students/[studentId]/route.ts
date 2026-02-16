@@ -3,10 +3,10 @@ import { executeQuery } from "@/lib/db"
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ studentId: string }> }) {
   try {
-    const unwrappedParams = await params
-    const { studentId } = unwrappedParams
+    const { studentId } = await params;
     console.log("Updating student:", studentId)
-    const { name, email, student_id, status } = await request.json()
+    const body = await request.json();
+    const { name, email, student_id, status } = body;
 
     if (!name || !email || !student_id) {
       return NextResponse.json({ success: false, message: "Name, email, and student ID are required" }, { status: 400 })
@@ -16,7 +16,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       UPDATE students 
       SET name = ?, email = ?, student_id = ?, status = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `
+    `;
+    
     const result = await executeQuery(query, [name, email, student_id, status, studentId])
 
     if (result.affectedRows === 0) {
@@ -31,18 +32,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   } catch (error) {
     console.error("Error updating student:", error)
     return NextResponse.json(
-      { success: false, message: "Failed to update student", error: error.message },
+      { success: false, message: "Failed to update student", error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
     )
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { studentId: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ studentId: string }> }) {
   try {
-    console.log("Deleting student:", params.studentId)
+    const { studentId } = await params;
+    console.log("Deleting student:", studentId)
 
     const query = "DELETE FROM students WHERE id = ?"
-    const result = await executeQuery(query, [params.studentId])
+    const result = await executeQuery(query, [studentId])
 
     if (result.affectedRows === 0) {
       return NextResponse.json({ success: false, message: "Student not found" }, { status: 404 })

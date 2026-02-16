@@ -3,10 +3,11 @@ import { executeQuery } from "@/lib/db"
 
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ teacherId: string }> }) {
   try {
-    const unwrappedParams = await params
-    const { teacherId } = unwrappedParams
+    const { teacherId } = await params;
     console.log("Updating teacher:", teacherId)
-    const { name, email, department, status } = await request.json()
+    const body = await request.json();
+    const { name, email, department, status } = body;
+    
 
     if (!name || !email || !department) {
       return NextResponse.json({ success: false, message: "Name, email, and department are required" }, { status: 400 })
@@ -16,7 +17,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       UPDATE teachers 
       SET name = ?, email = ?, department = ?, status = ?, updated_at = CURRENT_TIMESTAMP
       WHERE id = ?
-    `
+    `;
+    
     const result = await executeQuery(query, [name, email, department, status, teacherId])
 
     if (result.affectedRows === 0) {
@@ -31,7 +33,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
   } catch (error) {
     console.error("Error updating teacher:", error)
     return NextResponse.json(
-      { success: false, message: "Failed to update teacher", error: error.message },
+      { success: false, message: "Failed to update teacher", error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
     )
   }
@@ -39,8 +41,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ teacherId: string }> }) {
   try {
-    const unwrappedParams = await params
-    const { teacherId } = unwrappedParams
+    const { teacherId } = await params;
     console.log("Deleting teacher:", teacherId)
 
     const query = "DELETE FROM teachers WHERE id = ?"
@@ -58,7 +59,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   } catch (error) {
     console.error("Error deleting teacher:", error)
     return NextResponse.json(
-      { success: false, message: "Failed to delete teacher", error: error.message },
+      { success: false, message: "Failed to delete teacher", error: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 },
     )
   }

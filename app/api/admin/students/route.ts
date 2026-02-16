@@ -1,26 +1,11 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { executeQuery } from "@/lib/db"
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
-    console.log("Fetching students...")
-    const { searchParams } = new URL(request.url)
-    const teacherId = searchParams.get("teacherId")
-    const onlyTeacherStudents = searchParams.get("teacherOnly") === "true"
-
-    // If teacherId is provided, filter by that teacher (for admin view or teacher self-serve)
-    // If onlyTeacherStudents is true, enforce teacher filtering (for teacher dashboard)
-    let query = "SELECT s.*, t.name as teacher_name FROM students s LEFT JOIN teachers t ON s.teacher_id = t.id"
-    let params: any[] = []
-
-    if (teacherId) {
-      query += " WHERE s.teacher_id = ?"
-      params = [teacherId]
-    }
-
-    query += " ORDER BY s.created_at DESC"
-
-    const students = await executeQuery(query, params)
+    console.log("Fetching all students...")
+    const query = "SELECT * FROM students ORDER BY created_at DESC"
+    const students = await executeQuery(query)
 
     return NextResponse.json({
       success: true,
@@ -56,15 +41,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, message: "Email already exists" }, { status: 400 })
     }
 
-    // Get the first teacher as default assignment
-    const firstTeacher = await executeQuery("SELECT id FROM teachers WHERE status = 'active' LIMIT 1")
-    const defaultTeacherId = firstTeacher && firstTeacher.length > 0 ? firstTeacher[0].id : 1
-
     const query = `
-      INSERT INTO students (name, email, student_id, status, department, year_level, teacher_id) 
-      VALUES (?, ?, ?, ?, 'General', 1, ?)
+      INSERT INTO students (name, email, student_id, status, department, year_level) 
+      VALUES (?, ?, ?, ?, 'General', 1)
     `
-    const result = await executeQuery(query, [name, email, studentId, status || "active", defaultTeacherId])
+    const result = await executeQuery(query, [name, email, studentId, status || "active"])
 
     console.log("Student created successfully:", result)
 
