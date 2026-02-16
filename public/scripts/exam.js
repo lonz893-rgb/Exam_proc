@@ -1103,9 +1103,7 @@ async function logViolationToSheet(violationType, violationCount) {
       timestamp: new Date().toISOString()
     };
     
-    const nextJsApiUrl = NEXTJS_API_URL 
-      ? `${NEXTJS_API_URL}/api/violations`
-      : '/api/violations';
+    const nextJsApiUrl = '/api/violations';  // Use relative URL always
     
     fetch(nextJsApiUrl, {
       method: 'POST',
