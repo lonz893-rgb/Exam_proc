@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
         v.exam_session_id, 
         v.student_name, 
         v.exam_title, 
-        v.violation_type, 
+        v.violation_type as violationType,
         v.description, 
         v.severity, 
         v.timestamp
