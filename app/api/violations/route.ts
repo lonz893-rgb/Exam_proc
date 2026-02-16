@@ -158,7 +158,7 @@ export async function POST(request: NextRequest) {
       currentTimestamp,
     ])) as any
 
-    console.log("[v0] Violation inserted with ID:", result.insertId, "for session:", sessionId)
+    // console.log("[v0] Violation inserted with ID:", result.insertId, "for session:", sessionId)
 
     return NextResponse.json(
       {
