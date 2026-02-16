@@ -64,6 +64,7 @@ interface ExamSession {
   start_time: string
   duration_minutes: number
   violations?: Violation[]
+  is_google_sheets?: boolean
 }
 
 export default function TeacherDashboard() {
@@ -983,10 +984,27 @@ export default function TeacherDashboard() {
                             </div>
                             <p className="text-sm text-gray-600">{session.exam_title}</p>
                             {(() => {
-                              // Calculate violations for this session using session ID
-                              const sessionViolations = violations.filter(
+                              // Match violations differently based on session type
+                              let sessionViolations;
+
+                              if (session.is_google_sheets) {
+                              // For Google Sheets sessions: match by student name and exam title
+                              sessionViolations = violations.filter((v) => {
+                                const vStudent = v.studentName?.trim().toLowerCase();
+                                const vExam = v.examTitle?.trim().toLowerCase();
+                                const sStudent = session.student_name?.trim().toLowerCase();
+                                const sExam = (session.exam_title + ' Exam')?.trim().toLowerCase();
+                                
+                                return v.exam_session_id === null && 
+                                      vStudent === sStudent && 
+                                      (vExam === sExam || vExam === session.exam_title?.trim().toLowerCase());
+                                  });
+                                } else {
+                              // For real Next.js sessions: match by session ID
+                              sessionViolations = violations.filter(
                                 (v) => v.exam_session_id && v.exam_session_id === parseInt(session.id)
-                              )
+                                );
+                               }
                               return (
                                 <>
                                   <div className="flex items-center gap-4 text-xs text-gray-500">
