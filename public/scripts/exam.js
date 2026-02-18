@@ -1,4 +1,4 @@
-/* exam.js - COMPLETE CODE with Fullscreen Enforcement + Violation Logging + V2 Skipped Logic */
+/* exam.js - COMPLETE CODE with Fullscreen Enforcement + Violation Logging + V2 Skipped Logic + FIXED COUNTERS */
 
 // Fallback API URL (kept for backwards-compatibility)
 const FALLBACK_ANSWER_API_URL = "https://script.google.com/macros/s/AKfycby6B9OgDmMNJqGmDNBvF7MJnAaV1wXTnvmzjjCEqn8vIh1zEFx7Izn3jxEJIsvnuXF4/exec";
@@ -199,6 +199,15 @@ const examTimerEl = document.getElementById('examTimer');
 let totalQuestionCount = 0;
 let initialTotalCount = 0;
 
+// Try to recover initial total from storage on load
+try {
+  const savedTotal = sessionStorage.getItem('exam_initial_total_v1');
+  if (savedTotal) {
+    initialTotalCount = parseInt(savedTotal, 10);
+    totalQuestionCount = initialTotalCount;
+  }
+} catch(e) {}
+
 function isOnline() { return navigator.onLine; }
 
 function normalizeCode(raw) {
@@ -219,6 +228,20 @@ function formatTime(s) {
 
 function updateHudEl(el, text) {
   if (el) { el.textContent = text; el.classList.add('updated'); setTimeout(() => el.classList.remove('updated'), 600); }
+}
+
+function getFixedTotal() {
+  // Helper to ensure denominator never shrinks
+  if (initialTotalCount && initialTotalCount > 0) return initialTotalCount;
+  try {
+    const s = sessionStorage.getItem('exam_initial_total_v1');
+    if (s) {
+      initialTotalCount = parseInt(s, 10);
+      return initialTotalCount;
+    }
+  } catch(e){}
+  // Fallback if not yet set
+  return questions.length + skippedBatch.length + Object.keys(userAnswers).length;
 }
 
 function startGlobalCountdown() {
@@ -286,6 +309,15 @@ function submitAnswer(ans) {
     localStorage.setItem('exam_drafts_v1', JSON.stringify(drafts));
   } catch(e){}
 
+  // 3. Remove from skipped batch if applicable (V1 PARITY FIX)
+  const sbIndex = skippedBatch.findIndex(s => s.code === q.code);
+  if (sbIndex !== -1) {
+    skippedBatch.splice(sbIndex, 1);
+    saveSkippedBatch();
+    const sqUp = document.getElementById('skippedPill');
+    if (sqUp) sqUp.textContent = `Check Skipped Questions ${skippedBatch.length}`;
+  }
+
   const correctAns = String(answersMap[q.code] || '').trim();
   const userAns = String(ans || '').trim();
   
@@ -293,11 +325,12 @@ function submitAnswer(ans) {
     score++;
   }
 
-  // --- UPDATED HUD LOGIC FROM V2 ---
+  // --- UPDATED HUD LOGIC (V1 Style Stability) ---
   const answeredCount = Object.keys(userAnswers).length;
-  // Use the fixed initial total so the denominator doesn't shrink.
-  const totalFixed = typeof initialTotalCount !== 'undefined' ? initialTotalCount : questions.length;
-  updateHudEl(examProgressEl, `Questions ${answeredCount}/${totalFixed}`);
+  updateHudEl(examProgressEl, `Questions ${answeredCount}/${getFixedTotal()}`);
+
+  const sqEl = document.getElementById('skippedPill');
+  if (sqEl) sqEl.textContent = `Check Skipped Questions ${skippedBatch.length}`;
 
   current++;
   
@@ -309,7 +342,7 @@ function submitAnswer(ans) {
   if (skippedBatch.length > 0) {
     setTimeout(() => {
       // Logic for transitioning to skipped phase
-      const initialTotal = totalQuestionCount || initialTotalCount;
+      const initialTotal = initialTotalCount || totalQuestionCount;
       const appended = skippedBatch.map(s => ({
         code: s.code,
         question: s.question,
@@ -324,8 +357,9 @@ function submitAnswer(ans) {
       saveSkippedBatch();
       inSkippedPhase = true;
 
+      // Update HUD immediately upon phase change
       const currentAnswered = Object.keys(userAnswers).length;
-      updateHudEl(examProgressEl, `Questions ${currentAnswered}/${initialTotalCount || totalQuestionCount}`);
+      updateHudEl(examProgressEl, `Questions ${currentAnswered}/${getFixedTotal()}`);
 
       const sqEl = document.getElementById('skippedPill');
       if(sqEl) sqEl.textContent = `Check Skipped Questions 0/${questions.length}`;
@@ -378,9 +412,14 @@ function renderQuestion(index) {
   if (!q) return;
 
   visitedQuestions.add(q.code);
+  
+  // --- UPDATED HUD LOGIC (V1 Style Stability) ---
   const answeredCount = Object.keys(userAnswers).length;
-  const totalFixed = initialTotalCount || totalQuestionCount || questions.length;
-  updateHudEl(examProgressEl, `Questions ${answeredCount}/${totalFixed}`);
+  updateHudEl(examProgressEl, `Questions ${answeredCount}/${getFixedTotal()}`);
+
+  // Update Skipped Pill (Ensure pill stays accurate on reload/render)
+  const sqEl = document.getElementById('skippedPill'); 
+  if (sqEl) sqEl.textContent = `Check Skipped Questions ${skippedBatch.length}`;
 
   const card = document.createElement('div');
   card.className = 'card card-custom mx-auto fade-in' + (inSkippedPhase ? ' skipped-phase' : '');
@@ -510,7 +549,7 @@ function renderQuestion(index) {
   }
 }
 
-// --- UPDATED SKIP LOGIC FROM V2 (Maintains correct HUD counts) ---
+// --- UPDATED SKIP LOGIC FROM V2 (FIXED ACCURACY) ---
 function markSkipForCurrent() {
   const currentQ = questions[current];
   if (!currentQ) return;
@@ -530,16 +569,10 @@ function markSkipForCurrent() {
   // 3. Remove the skipped question from the current questions array
   questions.splice(current, 1);
 
-  // --- UPDATED HUD LOGIC START ---
-  // Skipping keeps the 'answered' count (numerator) the same.
+  // --- FIXED HUD LOGIC START (V1 Style Stability) ---
   const answeredCount = Object.keys(userAnswers).length;
-  // Use the fixed initial total so the denominator doesn't shrink.
-  const totalFixed = typeof initialTotalCount !== 'undefined' 
-    ? initialTotalCount 
-    : (questions.length + skippedBatch.length + answeredCount);
-
-  updateHudEl(examProgressEl, `Questions ${answeredCount}/${totalFixed}`);
-  // --- UPDATED HUD LOGIC END ---
+  updateHudEl(examProgressEl, `Questions ${answeredCount}/${getFixedTotal()}`);
+  // --- FIXED HUD LOGIC END ---
 
   const sq = document.getElementById('skippedPill'); 
   if (sq) sq.textContent = `Check Skipped Questions ${skippedBatch.length}`;
@@ -569,7 +602,7 @@ function markSkipForCurrent() {
     
     // Update HUD for start of skipped phase
     const currentAnswered = Object.keys(userAnswers).length;
-    updateHudEl(examProgressEl, `Questions ${currentAnswered}/${initialTotalCount || questions.length}`);
+    updateHudEl(examProgressEl, `Questions ${currentAnswered}/${getFixedTotal()}`);
     
     const sq2 = document.getElementById('skippedPill'); 
     if (sq2) sq2.textContent = `Check Skipped Questions 0/${questions.length}`;
@@ -676,6 +709,7 @@ async function fetchAllQuestionsAndAnswers() {
     allQuestionsMasterList = fullQuestions.slice();
 
     totalQuestionCount = questions.length;
+    // LOCK THIS DOWN IMMEDIATELY
     initialTotalCount = questions.length;
     try { sessionStorage.setItem('exam_initial_total_v1', String(initialTotalCount)); } catch(e){}
 
@@ -715,6 +749,13 @@ async function startExam(lastName, firstName, code) {
     
     isExamActive = true;
     startExternalScriptMonitoring();
+
+    // === AGGRESSIVE CLEANUP: Ensure we don't load "ghost" skips from previous sessions ===
+    // We clear the global variable AND localStorage before fetching new questions
+    skippedBatch = [];
+    try { localStorage.removeItem('exam_skipped_batch_v1'); } catch(e){}
+    try { localStorage.removeItem('exam_drafts_v1'); } catch(e){}
+    // ===================================================================================
 
     const success = await fetchAllQuestionsAndAnswers();
     if (!success || !questions.length) {
@@ -973,13 +1014,8 @@ async function finishExam(reason) {
   userInfo.endTime = new Date().toISOString(); 
   userInfo.date = userInfo.endTime.split('T')[0];
   
-  let savedInitial = initialTotalCount || totalQuestionCount || 0;
-  try { 
-    const s = sessionStorage.getItem('exam_initial_total_v1'); 
-    if (!savedInitial && s) savedInitial = parseInt(s, 10) || savedInitial; 
-  } catch(e){}
-  
-  const totalForSummary = savedInitial || questions.length || 0;
+  // Use getFixedTotal helper to ensure we have the correct total count
+  const totalForSummary = getFixedTotal();
   const allCodes = Object.keys(answersMap || {});
   const correctList = [];
   const mistakesList = [];
@@ -1048,12 +1084,7 @@ async function finishExam(reason) {
   try { sessionStorage.removeItem('exam_behavior_warnings_v1'); behaviorWarnings = 0; } catch(e){}
   
   setTimeout(() => {
-    let savedInitial = initialTotalCount || totalQuestionCount || 0;
-    try { 
-      const s = sessionStorage.getItem('exam_initial_total_v1'); 
-      if (!savedInitial && s) savedInitial = parseInt(s, 10) || savedInitial; 
-    } catch(e){}
-    const total = savedInitial || questions.length || 0;
+    const total = getFixedTotal();
     const q = new URLSearchParams({ 
       violated: userInfo.violated ? '1' : '0', 
       score: `${score}/${total}` 
