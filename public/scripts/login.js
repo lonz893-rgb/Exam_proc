@@ -1,4 +1,4 @@
-/* login.js - Updated with fullscreen enforcement */
+/* login.js - Updated with fullscreen enforcement, Next.js status check, and bright red error text */
 
 const FALLBACK_ANSWER_API_URL = "https://script.google.com/macros/s/AKfycby6B9OgDmMNJqGmDNBvF7MJnAaV1wXTnvmzjjCEqn8vIh1zEFx7Izn3jxEJIsvnuXF4/exec";
 
@@ -60,7 +60,33 @@ if (startBtn) {
     startBtn.disabled = true;
 
     try {
-      // Check for duplicate
+      // =========================================================
+      // 1. NEW NEXT.JS STATUS CHECK (Is the exam active?)
+      // =========================================================
+      const nextJsUrl = window.NEXTJS_API_URL || '';
+      if (nextJsUrl) {
+        const verifyRes = await fetch(`${nextJsUrl}/api/exams/verify?code=${encodeURIComponent(checkData.code)}`);
+        const verifyData = await verifyRes.json();
+
+        if (!verifyData.success) {
+           throw new Error(verifyData.message || "Invalid test code. Please check and try again.");
+        }
+
+        // Check specific status and shout errors if not active
+        if (verifyData.status === 'draft') {
+          throw new Error("The exam is still in draft mode. Please wait for your instructor to open it.");
+        } else if (verifyData.status === 'completed') {
+          throw new Error("This exam has already ended.");
+        } else if (verifyData.status !== 'active') {
+          throw new Error("This exam is currently not available.");
+        }
+      } else {
+        console.warn("NEXTJS_API_URL is not defined. Skipping status check.");
+      }
+
+      // =========================================================
+      // 2. EXISTING GOOGLE APPS SCRIPT DUPLICATE CHECK
+      // =========================================================
       const params = new URLSearchParams({ action: 'checkDuplicate', lastName, firstName, code: checkData.code });
       const res = await fetch(apiUrl(), {
         method: 'POST',
@@ -80,7 +106,7 @@ if (startBtn) {
         return;
       }
 
-      // Show instructions modal
+      // Show instructions modal if everything passes
       const instructionsText = document.getElementById('instructionsText');
       if (instructionsText) {
         instructionsText.innerHTML = `
@@ -103,7 +129,10 @@ if (startBtn) {
       startBtn.disabled = false;
       
       const et = document.getElementById('errorText');
-      if (et) et.innerHTML = `<strong>Connection Error:</strong><br>${err.message}<br><br>Please check your internet connection and try again.`;
+      // Added a span with a bright red color (#ff6b6b) so it is highly visible on dark backgrounds
+      if (et) {
+        et.innerHTML = `<span style="color: #ff6b6b; font-size: 1.05rem;"><strong>Access Denied:</strong><br>${err.message}</span>`;
+      }
       errorModal.show();
     }
   });

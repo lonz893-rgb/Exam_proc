@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
       success: true,
       exams: results,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Get exams error:", error)
     return NextResponse.json(
       {
@@ -37,18 +37,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { title, description, formUrl, duration, startTime, endTime, teacherId } = await request.json()
+    const { title, description, formUrl, duration, startTime, endTime, teacherId, unique_id, uniqueId } = await request.json()
 
-    if (!title || !formUrl || !teacherId) {
+    // 1. Made validation slightly more flexible (removed formUrl check as it can default to N/A)
+    if (!title || !teacherId) {
       return NextResponse.json({ success: false, message: "Missing required fields" }, { status: 400 })
     }
 
-    // Generate unique ID from title
-    const uniqueId = title.substring(0, 4).toUpperCase() + Date.now().toString().slice(-6)
+    const finalUniqueId = unique_id || uniqueId || (title.substring(0, 4).toUpperCase() + Date.now().toString().slice(-6))
 
-    // Convert datetime strings to MySQL format
-    const mysqlStartTime = startTime ? new Date(startTime).toISOString().slice(0, 19).replace("T", " ") : null
-    const mysqlEndTime = endTime ? new Date(endTime).toISOString().slice(0, 19).replace("T", " ") : null
+    // 2. THE FIX: Safe string manipulation instead of new Date().toISOString()
+    // This stops the 8-hour timezone shift and prevents server crashes!
+    const mysqlStartTime = startTime ? startTime.replace("T", " ") + (startTime.length === 16 ? ":00" : "") : null;
+    const mysqlEndTime = endTime ? endTime.replace("T", " ") + (endTime.length === 16 ? ":00" : "") : null;
 
     const query = `
       INSERT INTO exams (title, description, form_url, duration_minutes, start_time, end_time, teacher_id, unique_id, status)
@@ -58,12 +59,12 @@ export async function POST(request: NextRequest) {
     const params = [
       title,
       description || null,
-      formUrl,
+      formUrl || "N/A", 
       duration || 60,
       mysqlStartTime,
       mysqlEndTime,
       teacherId,
-      uniqueId,
+      finalUniqueId,
     ]
 
     console.log("Creating exam with params:", params)
@@ -74,9 +75,9 @@ export async function POST(request: NextRequest) {
       success: true,
       message: "Exam created successfully",
       examId: result.insertId,
-      uniqueId: uniqueId,
+      uniqueId: finalUniqueId, 
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Create exam error:", error)
     return NextResponse.json(
       {

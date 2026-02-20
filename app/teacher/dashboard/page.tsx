@@ -1,11 +1,11 @@
 "use client"
-export const dynamic = "force-dynamic"; // Add this line!
+export const dynamic = "force-dynamic"; 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Shield, Users, AlertTriangle, Eye, Activity } from "lucide-react"
+import { Shield, Users, AlertTriangle, Eye, Activity, Plus, FileText, Play, Pause, Square, Trash2, List, Sun, Moon } from "lucide-react"
 import { useRouter } from "next/navigation"
 import {
   Dialog,
@@ -18,7 +18,6 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
-import { Plus, FileText, Play, Pause, Square, Trash2 } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
@@ -63,8 +62,13 @@ interface ExamSession {
   violation_count: number
   start_time: string
   duration_minutes: number
-  violations?: Violation[]
   is_google_sheets?: boolean
+}
+
+// Enhanced Interface to prevent TypeScript build errors
+interface EnhancedExamSession extends ExamSession {
+  sessionViolations: Violation[];
+  matchingViolations: Violation[];
 }
 
 export default function TeacherDashboard() {
@@ -75,22 +79,32 @@ export default function TeacherDashboard() {
   const [isLoading, setIsLoading] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   
+  // Theme State
+  const [isDarkMode, setIsDarkMode] = useState(true)
+
+  // --- CAROUSEL STATE ---
+  const [currentSlide, setCurrentSlide] = useState(0)
+  const backgroundImages = [
+    "/photo1.jpg",
+    "/photo2.jpg",
+    "/photo3.jpg"
+  ]
+  // ----------------------
+
   // Search and filter states
-  const [violationSearch, setViolationSearch] = useState("")
   const [monitoringSearch, setMonitoringSearch] = useState("")
   const [selectedSeverity, setSelectedSeverity] = useState<string>("all")
   const [selectedViolationType, setSelectedViolationType] = useState<string>("all")
-  const [selectedSession, setSelectedSession] = useState<ExamSession | null>(null)
+  const [selectedSession, setSelectedSession] = useState<EnhancedExamSession | null>(null)
 
   // Dialog states
   const [showCreateExam, setShowCreateExam] = useState(false)
-  const [editingExam, setEditingExam] = useState<Exam | null>(null)
 
   // Form states
   const [newExam, setNewExam] = useState({
     title: "",
     description: "",
-    formUrl: "",
+    examCode: "", 
     duration: 60,
     startTime: "",
     endTime: "",
@@ -98,21 +112,80 @@ export default function TeacherDashboard() {
 
   const [stats, setStats] = useState({
     totalActive: 0,
-    totalViolations: 0,
     flaggedStudents: 0,
   })
 
   const router = useRouter()
   const { toast } = useToast()
 
+  // --- CAROUSEL EFFECT ---
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide((prev) => (prev + 1) % backgroundImages.length)
+    }, 6000)
+    return () => clearInterval(timer)
+  }, [backgroundImages.length])
+  // -----------------------
+
   // Helper function to format datetime for input
   const formatDateTimeForInput = (date: Date) => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, "0")
-    const day = String(date.getDate()).padStart(2, "0")
-    const hours = String(date.getHours()).padStart(2, "0")
-    const minutes = String(date.getMinutes()).padStart(2, "0")
-    return `${year}-${month}-${day}T${hours}:${minutes}`
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
+  // Original Formatter: Keeps Teacher Logs untouched and working perfectly
+  const formatDisplayDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+    try {
+      let safeString = dateString.trim().replace(' ', 'T');
+      if (!safeString.endsWith('Z') && !safeString.includes('+') && !safeString.includes('-')) {
+        safeString += 'Z';
+      }
+      
+      const dateObj = new Date(safeString);
+      if (isNaN(dateObj.getTime())) return dateString;
+
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Manila',
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      }).format(dateObj);
+    } catch (e) {
+      return dateString;
+    }
+  }
+
+  // FIX: Dedicated formatter exclusively for Activity Logs to mathematically correct the 8-hour delay
+  const formatActivityDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+    try {
+      const dateObj = new Date(dateString);
+      if (isNaN(dateObj.getTime())) return dateString;
+
+      // Add exactly 8 hours to counteract the UTC shift specific to the activity logs/violations
+      dateObj.setHours(dateObj.getHours() + 8);
+
+      return new Intl.DateTimeFormat('en-US', {
+        month: '2-digit',
+        day: '2-digit',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      }).format(dateObj);
+    } catch (e) {
+      return dateString;
+    }
   }
 
   // Set default start time to current time when dialog opens
@@ -128,17 +201,6 @@ export default function TeacherDashboard() {
       }))
     }
   }, [showCreateExam])
-
-  // Optional: Poll for live updates every 3 seconds for real-time monitoring
-  useEffect(() => {
-    if (!teacherData?.id) return
-
-    const pollInterval = setInterval(() => {
-      pollLiveData(teacherData.id)
-    }, 3000) // Poll every 3 seconds for faster updates
-
-    return () => clearInterval(pollInterval)
-  }, [teacherData?.id])
 
   useEffect(() => {
     const storedTeacherData = localStorage.getItem("teacherData")
@@ -175,7 +237,7 @@ export default function TeacherDashboard() {
           endTime: exam.end_time,
           status: exam.status,
           createdAt: exam.created_at,
-          uniqueId: exam.unique_id,
+          uniqueId: exam.unique_id || exam.uniqueId || exam.id.toString(),
         }))
         setExams(formattedExams)
 
@@ -201,16 +263,11 @@ export default function TeacherDashboard() {
   const pollLiveData = async (teacherId: number) => {
     try {
       setIsRefreshing(true)
-      console.log("[v0] Polling live data for teacher:", teacherId)
-      
-      // Add cache-busting timestamp to prevent stale data
       const timestamp = Date.now()
       
       // Load violations
       const violationsResponse = await fetch(`/api/violations?teacherId=${teacherId}&_t=${timestamp}`)
       const violationsData = await violationsResponse.json()
-
-      console.log("[v0] Violations response:", violationsData)
 
       if (violationsData.success && violationsData.violations) {
         const formattedViolations = violationsData.violations.map((violation: any) => ({
@@ -223,16 +280,8 @@ export default function TeacherDashboard() {
           timestamp: violation.timestamp,
           severity: violation.severity || "medium",
         }))
-        console.log("[v0] Formatted violations:", formattedViolations.length, "violations")
         setViolations(formattedViolations)
-
-        // Update stats
-        setStats((prev) => ({
-          ...prev,
-          totalViolations: formattedViolations.length,
-        }))
       } else {
-        console.log("[v0] No violations found or API error:", violationsData)
         setViolations([])
       }
 
@@ -240,41 +289,28 @@ export default function TeacherDashboard() {
       const sessionsResponse = await fetch(`/api/exam-sessions?teacherId=${teacherId}&_t=${timestamp}`)
       const sessionsData = await sessionsResponse.json()
 
-      console.log("[v0] Sessions response:", sessionsData.sessions?.length || 0, "sessions")
-
       if (sessionsData.success && sessionsData.sessions) {
         setActiveSessions(sessionsData.sessions || [])
       } else {
         setActiveSessions([])
       }
     } catch (error) {
-      console.error("[v0] Error polling live data:", error)
+      console.error("[v0] Error fetching live data:", error)
     } finally {
       setIsRefreshing(false)
     }
   }
 
   const handleCreateExam = async () => {
-    if (!newExam.title || !newExam.formUrl || !teacherData) {
+    if (!newExam.title || !newExam.examCode || !teacherData) {
       toast({
         title: "Error",
-        description: "Please fill in all required fields",
+        description: "Please fill in all required fields (Title and Exam Code are required)",
         variant: "destructive",
       })
       return
     }
 
-    // Validate start time is not in the past
-    if (newExam.startTime && new Date(newExam.startTime) < new Date()) {
-      toast({
-        title: "Error",
-        description: "Start time cannot be in the past",
-        variant: "destructive",
-      })
-      return
-    }
-
-    // Validate end time is after start time
     if (newExam.startTime && newExam.endTime && new Date(newExam.endTime) <= new Date(newExam.startTime)) {
       toast({
         title: "Error",
@@ -285,14 +321,29 @@ export default function TeacherDashboard() {
     }
 
     try {
+      // Prepare times securely for MySQL
+      const formattedStartTime = newExam.startTime ? newExam.startTime.replace("T", " ") + ":00" : null;
+      const formattedEndTime = newExam.endTime ? newExam.endTime.replace("T", " ") + ":00" : null;
+
       const response = await fetch("/api/exams", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...newExam,
-          teacherId: teacherData.id,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          title: newExam.title,
+          description: newExam.description,
+          examCode: newExam.examCode, 
+          unique_id: newExam.examCode, 
+          uniqueId: newExam.examCode, 
+          teacherId: teacherData.id, 
+          teacher_id: teacherData.id, 
+          duration: newExam.duration,
+          duration_minutes: newExam.duration,
+          formUrl: "N/A",
+          form_url: "N/A",
+          startTime: formattedStartTime,
+          start_time: formattedStartTime,
+          endTime: formattedEndTime,
+          end_time: formattedEndTime
         }),
       })
 
@@ -301,35 +352,23 @@ export default function TeacherDashboard() {
       if (data.success) {
         toast({
           title: "Exam Created Successfully!",
-          description: `${newExam.title} created with Unique Form ID: ${data.uniqueId}`,
+          description: `${newExam.title} created with Code: ${newExam.examCode}`,
         })
-
-        // Reload exams
         await loadTeacherData(teacherData.id)
-
         setShowCreateExam(false)
-        setNewExam({
-          title: "",
-          description: "",
-          formUrl: "",
-          duration: 60,
-          startTime: "",
-          endTime: "",
-        })
+        setNewExam({ title: "", description: "", examCode: "", duration: 60, startTime: "", endTime: "" })
       } else {
-        toast({
-          title: "Error",
-          description: data.message || "Failed to create exam",
-          variant: "destructive",
+        const errorMsg = data.error || data.message || "Failed to create exam";
+        const isDuplicate = errorMsg.toLowerCase().includes("duplicate");
+        
+        toast({ 
+          title: "Error", 
+          description: isDuplicate ? "That Exam Code is already in use. Please try a different code." : errorMsg, 
+          variant: "destructive" 
         })
       }
     } catch (error) {
-      console.error("Create exam error:", error)
-      toast({
-        title: "Error",
-        description: "Connection error. Please try again.",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Connection error. Please try again.", variant: "destructive" })
     }
   }
 
@@ -337,75 +376,38 @@ export default function TeacherDashboard() {
     try {
       const response = await fetch(`/api/exams/${examId}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: newStatus }),
       })
 
       const data = await response.json()
 
       if (data.success) {
-        toast({
-          title: "Success",
-          description: data.message,
-        })
-
-        // Reload exams
-        if (teacherData) {
-          await loadTeacherData(teacherData.id)
-        }
+        toast({ title: "Success", description: data.message })
+        if (teacherData) await loadTeacherData(teacherData.id)
       } else {
-        toast({
-          title: "Error",
-          description: data.message || "Failed to update exam status",
-          variant: "destructive",
-        })
+        toast({ title: "Error", description: data.message || "Failed to update exam status", variant: "destructive" })
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Connection error. Please try again.",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Connection error. Please try again.", variant: "destructive" })
     }
   }
 
   const handleDeleteExam = async (examId: string) => {
-    if (!confirm("Are you sure you want to delete this exam? This action cannot be undone.")) {
-      return
-    }
+    if (!confirm("Are you sure you want to delete this exam? This action cannot be undone.")) return
 
     try {
-      const response = await fetch(`/api/exams/${examId}`, {
-        method: "DELETE",
-      })
-
+      const response = await fetch(`/api/exams/${examId}`, { method: "DELETE" })
       const data = await response.json()
 
       if (data.success) {
-        toast({
-          title: "Success",
-          description: "Exam deleted successfully",
-        })
-
-        // Reload exams
-        if (teacherData) {
-          await loadTeacherData(teacherData.id)
-        }
+        toast({ title: "Success", description: "Exam deleted successfully" })
+        if (teacherData) await loadTeacherData(teacherData.id)
       } else {
-        toast({
-          title: "Error",
-          description: data.message || "Failed to delete exam",
-          variant: "destructive",
-        })
+        toast({ title: "Error", description: data.message || "Failed to delete exam", variant: "destructive" })
       }
     } catch (error) {
-      toast({
-        title: "Error",
-        description: "Connection error. Please try again.",
-        variant: "destructive",
-      })
+      toast({ title: "Error", description: "Connection error. Please try again.", variant: "destructive" })
     }
   }
 
@@ -416,58 +418,118 @@ export default function TeacherDashboard() {
   }
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800"
-      case "draft":
-        return "bg-blue-100 text-blue-800"
-      case "completed":
-        return "bg-gray-100 text-gray-800"
-      case "cancelled":
-        return "bg-red-100 text-red-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+    if (isDarkMode) {
+      switch (status) {
+        case "active": return "bg-green-500/20 text-green-400 border border-green-500/30"
+        case "draft": return "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+        case "completed": return "bg-slate-500/20 text-slate-300 border border-slate-500/30"
+        case "cancelled": return "bg-red-500/20 text-red-400 border border-red-500/30"
+        default: return "bg-slate-500/20 text-slate-300 border border-slate-500/30"
+      }
+    } else {
+      switch (status) {
+        case "active": return "bg-green-100 text-green-700 border border-green-300"
+        case "draft": return "bg-blue-100 text-blue-700 border border-blue-300"
+        case "completed": return "bg-slate-200 text-slate-700 border border-slate-400"
+        case "cancelled": return "bg-red-100 text-red-700 border border-red-300"
+        default: return "bg-slate-100 text-slate-700 border border-slate-300"
+      }
     }
   }
 
   const getSeverityColor = (severity: string) => {
-    switch (severity) {
-      case "high":
-        return "bg-red-100 text-red-800"
-      case "medium":
-        return "bg-yellow-100 text-yellow-800"
-      case "low":
-        return "bg-blue-100 text-blue-800"
-      default:
-        return "bg-gray-100 text-gray-800"
+    if (isDarkMode) {
+      switch (severity) {
+        case "high": return "bg-red-500/20 text-red-400 border border-red-500/30"
+        case "medium": return "bg-orange-500/20 text-orange-400 border border-orange-500/30"
+        case "low": return "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+        default: return "bg-slate-500/20 text-slate-300 border border-slate-500/30"
+      }
+    } else {
+      switch (severity) {
+        case "high": return "bg-red-100 text-red-700 border border-red-300"
+        case "medium": return "bg-orange-100 text-orange-700 border border-orange-300"
+        case "low": return "bg-blue-100 text-blue-700 border border-blue-300"
+        default: return "bg-slate-100 text-slate-700 border border-slate-300"
+      }
     }
   }
 
-  // Filter violations based on search and severity
-  const filteredViolations = violations.filter((violation) => {
-    const matchesSearch = 
-      violation.studentName.toLowerCase().includes(violationSearch.toLowerCase()) ||
-      violation.examTitle.toLowerCase().includes(violationSearch.toLowerCase()) ||
-      violation.description.toLowerCase().includes(violationSearch.toLowerCase()) ||
-      violation.violationType.toLowerCase().includes(violationSearch.toLowerCase())
-    
-    const matchesSeverity = selectedSeverity === "all" || violation.severity === selectedSeverity
-    const matchesType = selectedViolationType === "all" || violation.violationType === selectedViolationType
-    
-    return matchesSearch && matchesSeverity && matchesType
-  })
+  const uniqueViolationTypes = Array.from(new Set(violations.map((v) => v.violationType)))
 
-  // Filter sessions based on search
-  const filteredSessions = activeSessions.filter((session) => {
-    return (
+  const teacherExamCodes = exams.map(e => e.uniqueId?.toLowerCase().trim()).filter(Boolean);
+  const teacherExamTitles = exams.map(e => e.title?.toLowerCase().trim()).filter(Boolean);
+
+  const sessionsWithViolations: EnhancedExamSession[] = activeSessions.map(session => {
+    let sessionViolations: Violation[] = [];
+
+    if (session.is_google_sheets) {
+      sessionViolations = violations.filter((v) => {
+        const vStudent = v.studentName?.trim().toLowerCase();
+        const vExam = v.examTitle?.trim().toLowerCase();
+        const sStudent = session.student_name?.trim().toLowerCase();
+        const sExam = (session.exam_title + ' Exam')?.trim().toLowerCase();
+        return v.exam_session_id === null && vStudent === sStudent && (vExam === sExam || vExam === session.exam_title?.trim().toLowerCase());
+      });
+    } else {
+      sessionViolations = violations.filter((v) => v.exam_session_id && v.exam_session_id === parseInt(session.id));
+    }
+    
+    const matchingViolations = sessionViolations.filter(v => {
+      const matchesSeverity = selectedSeverity === "all" || v.severity === selectedSeverity;
+      const matchesType = selectedViolationType === "all" || v.violationType === selectedViolationType;
+      return matchesSeverity && matchesType;
+    });
+
+    return { ...session, sessionViolations, matchingViolations };
+  });
+
+  const filteredSessions = sessionsWithViolations.filter((session) => {
+    const sessionExamIdentifier = session.exam_title?.toLowerCase().trim() || "";
+
+    const isOwnExam = 
+      teacherExamCodes.includes(sessionExamIdentifier) || 
+      teacherExamTitles.includes(sessionExamIdentifier) || 
+      exams.some(e => e.id.toString() === session.exam_id?.toString());
+
+    if (!isOwnExam) return false;
+
+    const matchesSearch = 
       session.student_name.toLowerCase().includes(monitoringSearch.toLowerCase()) ||
       session.student_id.toLowerCase().includes(monitoringSearch.toLowerCase()) ||
-      session.exam_title.toLowerCase().includes(monitoringSearch.toLowerCase())
-    )
-  })
+      session.exam_title.toLowerCase().includes(monitoringSearch.toLowerCase());
+    
+    if (!matchesSearch) return false;
 
-  // Get unique violation types for filter
-  const uniqueViolationTypes = Array.from(new Set(violations.map((v) => v.violationType)))
+    if (selectedSeverity !== "all" || selectedViolationType !== "all") {
+      return session.matchingViolations.length > 0;
+    }
+
+    return true;
+  });
+
+  const trueTotalViolations = sessionsWithViolations
+    .filter((session) => {
+      const sessionExamIdentifier = session.exam_title?.toLowerCase().trim() || "";
+      return teacherExamCodes.includes(sessionExamIdentifier) || 
+             teacherExamTitles.includes(sessionExamIdentifier) || 
+             exams.some(e => e.id.toString() === session.exam_id?.toString());
+    })
+    .reduce((sum, session) => sum + session.sessionViolations.length, 0);
+
+
+  // --- THEME CLASSES ---
+  const themeBg = isDarkMode ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-900"
+  const overlayBg = isDarkMode ? "bg-slate-950/85" : "bg-white/85"
+  const cardBg = isDarkMode ? "bg-slate-900/90 border-slate-800" : "bg-white/90 border-slate-200"
+  const textPrimary = isDarkMode ? "text-white" : "text-slate-900"
+  const textSecondary = isDarkMode ? "text-slate-400" : "text-slate-500"
+  const inputBg = isDarkMode ? "bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus:ring-blue-500" : "bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:ring-blue-500"
+  const dialogBg = isDarkMode ? "bg-slate-900 border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
+  const rowBg = isDarkMode ? "border-slate-800 bg-slate-800/30 hover:bg-slate-800/70" : "border-slate-200 bg-slate-50/50 hover:bg-slate-100/70"
+  const headerBg = isDarkMode ? "bg-slate-950/80 border-white/10" : "bg-white/80 border-slate-200"
+  const emptyBoxBg = isDarkMode ? "bg-slate-900/50 border-slate-800 text-slate-500" : "bg-slate-50 border-slate-300 text-slate-500"
+  const dropItemHover = isDarkMode ? "focus:bg-slate-800 focus:text-white" : "focus:bg-slate-100 focus:text-slate-900"
 
   const getStatusActions = (exam: Exam) => {
     switch (exam.status) {
@@ -475,18 +537,14 @@ export default function TeacherDashboard() {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                Actions
-              </Button>
+              <Button variant="outline" size="sm" className={isDarkMode ? "border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white bg-slate-800/50" : "border-slate-300 text-slate-700 hover:bg-slate-100 bg-white"}>Actions</Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => handleExamStatusChange(exam.id, "active")}>
-                <Play className="h-4 w-4 mr-2" />
-                Activate Exam
+            <DropdownMenuContent className={dialogBg}>
+              <DropdownMenuItem className={`cursor-pointer ${dropItemHover}`} onClick={() => handleExamStatusChange(exam.id, "active")}>
+                <Play className="h-4 w-4 mr-2 text-green-500" /> Activate Exam
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDeleteExam(exam.id)} className="text-red-600">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Exam
+              <DropdownMenuItem className={`cursor-pointer text-red-500 ${isDarkMode ? 'focus:bg-slate-800' : 'focus:bg-slate-100'}`} onClick={() => handleDeleteExam(exam.id)}>
+                <Trash2 className="h-4 w-4 mr-2" /> Delete Exam
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -495,22 +553,17 @@ export default function TeacherDashboard() {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                Actions
-              </Button>
+              <Button variant="outline" size="sm" className={isDarkMode ? "border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white bg-slate-800/50" : "border-slate-300 text-slate-700 hover:bg-slate-100 bg-white"}>Actions</Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => handleExamStatusChange(exam.id, "draft")}>
-                <Pause className="h-4 w-4 mr-2" />
-                Deactivate Exam
+            <DropdownMenuContent className={dialogBg}>
+              <DropdownMenuItem className={`cursor-pointer ${dropItemHover}`} onClick={() => handleExamStatusChange(exam.id, "draft")}>
+                <Pause className="h-4 w-4 mr-2 text-yellow-500" /> Deactivate Exam
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExamStatusChange(exam.id, "completed")}>
-                <Square className="h-4 w-4 mr-2" />
-                Mark as Completed
+              <DropdownMenuItem className={`cursor-pointer ${dropItemHover}`} onClick={() => handleExamStatusChange(exam.id, "completed")}>
+                <Square className="h-4 w-4 mr-2 text-blue-500" /> Mark as Completed
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExamStatusChange(exam.id, "cancelled")}>
-                <Square className="h-4 w-4 mr-2" />
-                Cancel Exam
+              <DropdownMenuItem className={`cursor-pointer ${dropItemHover}`} onClick={() => handleExamStatusChange(exam.id, "cancelled")}>
+                <Square className="h-4 w-4 mr-2 text-slate-400" /> Cancel Exam
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -520,544 +573,417 @@ export default function TeacherDashboard() {
         return (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
-                Actions
-              </Button>
+              <Button variant="outline" size="sm" className={isDarkMode ? "border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white bg-slate-800/50" : "border-slate-300 text-slate-700 hover:bg-slate-100 bg-white"}>Actions</Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onClick={() => handleExamStatusChange(exam.id, "draft")}>
-                <Pause className="h-4 w-4 mr-2" />
-                Reset to Draft
+            <DropdownMenuContent className={dialogBg}>
+              <DropdownMenuItem className={`cursor-pointer ${dropItemHover}`} onClick={() => handleExamStatusChange(exam.id, "draft")}>
+                <Pause className="h-4 w-4 mr-2 text-yellow-500" /> Reset to Draft
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleDeleteExam(exam.id)} className="text-red-600">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Delete Exam
+              <DropdownMenuItem className={`cursor-pointer text-red-500 ${isDarkMode ? 'focus:bg-slate-800' : 'focus:bg-slate-100'}`} onClick={() => handleDeleteExam(exam.id)}>
+                <Trash2 className="h-4 w-4 mr-2" /> Delete Exam
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         )
-      default:
-        return null
+      default: return null
     }
   }
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className={`min-h-screen flex items-center justify-center ${themeBg}`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p>Loading dashboard...</p>
+          <p className={textSecondary}>Loading dashboard...</p>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-3">
-              <Shield className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-xl font-bold text-gray-900">IT Proctool Teacher Dashboard</h1>
-                <p className="text-sm text-gray-600">
-                  {teacherData?.name} - {teacherData?.department}
-                </p>
+    <div className={`relative min-h-screen font-sans overflow-hidden flex flex-col transition-colors duration-300 ${themeBg}`}>
+      
+      {/* --- CAROUSEL BACKGROUND --- */}
+      <div className="fixed inset-0 z-0">
+        {backgroundImages.map((img, index) => (
+          <div
+            key={img}
+            className={`absolute inset-0 bg-cover bg-center transition-opacity ease-in-out ${
+              index === currentSlide ? "opacity-100" : "opacity-0"
+            }`}
+            style={{ 
+              backgroundImage: `url('${img}')`,
+              transitionDuration: "3s" 
+            }}
+          />
+        ))}
+        <div className={`absolute inset-0 backdrop-blur-[2px] transition-colors duration-300 ${overlayBg}`}></div>
+      </div>
+
+      {/* --- MAIN CONTENT --- */}
+      <div className="relative z-10 flex flex-col flex-grow">
+        
+        {/* Header */}
+        <header className={`sticky top-0 z-50 backdrop-blur-md shadow-sm transition-colors duration-300 ${headerBg}`}>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-3 group cursor-pointer">
+                <Shield className={`h-8 w-8 drop-shadow-md group-hover:scale-105 transition-transform duration-300 ${isDarkMode ? 'text-white' : 'text-blue-600'}`} />
+                <div>
+                  <h1 className={`text-xl font-bold drop-shadow-md ${textPrimary}`}>PROCTOOL Dashboard</h1>
+                  <p className={`text-sm ${textSecondary}`}>
+                    {teacherData?.name} {teacherData?.department && teacherData.department !== "N/A" ? `- ${teacherData.department}` : ''}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Theme Toggle */}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setIsDarkMode(!isDarkMode)}
+                  className={isDarkMode ? "border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white bg-slate-900/50" : "border-slate-300 text-slate-700 hover:bg-slate-100 bg-white"}
+                >
+                  {isDarkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={handleLogout} 
+                  className={isDarkMode ? "border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white bg-slate-900/50" : "border-slate-300 text-slate-700 hover:bg-slate-100 bg-white"}
+                >
+                  Logout
+                </Button>
               </div>
             </div>
-            <Button variant="outline" onClick={handleLogout}>
-              Logout
-            </Button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Exams</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.totalActive}</div>
-              <p className="text-xs text-muted-foreground">Currently active exams</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Violations</CardTitle>
-              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">{stats.totalViolations}</div>
-              <p className="text-xs text-muted-foreground">Detected violations</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
-              <Plus className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <Dialog open={showCreateExam} onOpenChange={setShowCreateExam}>
-                <DialogTrigger asChild>
-                  <Button className="w-full">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Create New Exam
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-lg max-h-[90vh] overflow-hidden flex flex-col">
-                  <DialogHeader className="flex-shrink-0">
-                    <DialogTitle>Create New Exam</DialogTitle>
-                    <DialogDescription>Set up a new proctored exam with form integration</DialogDescription>
-                  </DialogHeader>
-
-                  {/* Scrollable Content */}
-                  <div className="flex-1 overflow-y-auto px-1">
-                    <div className="space-y-4 pb-4">
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <p className="text-sm text-blue-800">
-                          <strong>📋 Unique Form ID:</strong> A unique ID will be automatically generated for this exam
-                          that students will use to access the exam directly.
-                        </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="examTitle">Exam Title *</Label>
-                        <Input
-                          id="examTitle"
-                          placeholder="e.g., Mathematics Final Exam"
-                          value={newExam.title}
-                          onChange={(e) => setNewExam({ ...newExam, title: e.target.value })}
-                        />
-                        <p className="text-xs text-gray-500">First 4 letters will be used for the unique ID</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="examDescription">Description</Label>
-                        <Textarea
-                          id="examDescription"
-                          placeholder="Brief description of the exam"
-                          value={newExam.description}
-                          onChange={(e) => setNewExam({ ...newExam, description: e.target.value })}
-                          rows={3}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="formUrl">Form URL *</Label>
-                        <Input
-                          id="formUrl"
-                          placeholder="https://forms.google.com/..."
-                          value={newExam.formUrl}
-                          onChange={(e) => setNewExam({ ...newExam, formUrl: e.target.value })}
-                        />
-                        <p className="text-xs text-gray-500">Supports Google Forms, Typeform, Microsoft Forms, etc.</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="duration">Duration (minutes)</Label>
-                        <Input
-                          id="duration"
-                          type="number"
-                          min="1"
-                          max="480"
-                          value={newExam.duration}
-                          onChange={(e) => setNewExam({ ...newExam, duration: Number.parseInt(e.target.value) || 60 })}
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="startTime">Start Time</Label>
-                          <Input
-                            id="startTime"
-                            type="datetime-local"
-                            value={newExam.startTime}
-                            onChange={(e) => setNewExam({ ...newExam, startTime: e.target.value })}
-                          />
-                          <p className="text-xs text-gray-500">When students can begin the exam</p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="endTime">End Time (Optional)</Label>
-                          <Input
-                            id="endTime"
-                            type="datetime-local"
-                            value={newExam.endTime}
-                            onChange={(e) => setNewExam({ ...newExam, endTime: e.target.value })}
-                          />
-                          <p className="text-xs text-gray-500">
-                            Latest time to submit (leave empty for duration-based)
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Fixed Footer */}
-                  <div className="flex-shrink-0 pt-4 border-t">
-                    <Button onClick={handleCreateExam} className="w-full">
-                      Create Exam & Generate Unique ID
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Main Dashboard */}
-        <Tabs defaultValue="exams" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="exams">My Exams</TabsTrigger>
-            <TabsTrigger value="violations">Violations Log</TabsTrigger>
-            <TabsTrigger value="monitoring">Live Monitoring</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="exams" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      My Exams ({exams.length})
-                    </CardTitle>
-                    <CardDescription>Manage your created exams and forms</CardDescription>
-                  </div>
-                </div>
+        {/* Main Content */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+          
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <Card className={`backdrop-blur-sm shadow-xl transition-colors duration-300 ${cardBg}`}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className={`text-sm font-medium ${textSecondary}`}>Active Exams</CardTitle>
+                <Users className={`h-4 w-4 ${textSecondary}`} />
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {exams.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No exams created yet. Create your first exam to get started!</p>
-                    </div>
-                  ) : (
-                    exams.map((exam) => (
-                      <div key={exam.id} className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="flex-1">
-                          <h3 className="font-medium">{exam.title}</h3>
-                          <p className="text-sm text-gray-600">{exam.description}</p>
-                          <p className="text-xs text-gray-500">
-                            Created: {new Date(exam.createdAt).toLocaleDateString()} • Duration: {exam.duration} min
-                          </p>
-                          {exam.startTime && (
-                            <p className="text-xs text-gray-500">Start: {new Date(exam.startTime).toLocaleString()}</p>
-                          )}
-                          <p className="text-xs font-mono bg-blue-100 text-blue-800 px-2 py-1 rounded inline-block mt-1">
-                            Form ID: {exam.uniqueId}
-                          </p>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Badge className={getStatusColor(exam.status)}>{exam.status}</Badge>
-                          {getStatusActions(exam)}
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                <div className={`text-3xl font-bold ${textPrimary}`}>{stats.totalActive}</div>
+                <p className={`text-xs mt-1 ${textSecondary}`}>Currently active exams</p>
               </CardContent>
             </Card>
-          </TabsContent>
 
-          <TabsContent value="violations" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5" />
-                      Recent Violations ({filteredViolations.length} of {violations.length})
-                    </CardTitle>
-                    <CardDescription>Detailed log of all detected violations</CardDescription>
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => teacherData && pollLiveData(teacherData.id)}
-                    disabled={isRefreshing}
-                    className="flex items-center gap-2"
-                  >
-                    <Activity className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
-                  </Button>
-                </div>
+            <Card className={`backdrop-blur-sm shadow-xl transition-colors duration-300 ${cardBg}`}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className={`text-sm font-medium ${textSecondary}`}>Total Violations</CardTitle>
+                <AlertTriangle className={`h-4 w-4 ${textSecondary}`} />
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  {/* Search and Filter Controls */}
-                  <div className="space-y-4 pb-4 border-b">
-                    <div className="flex gap-2">
-                      <Input
-                        placeholder="Search violations by student, exam, or description..."
-                        value={violationSearch}
-                        onChange={(e) => setViolationSearch(e.target.value)}
-                        className="flex-1"
-                      />
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setViolationSearch("")
-                          setSelectedSeverity("all")
-                          setSelectedViolationType("all")
-                        }}
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <Label className="text-xs text-gray-600 mb-2 block">Filter by Severity</Label>
-                        <select
-                          value={selectedSeverity}
-                          onChange={(e) => setSelectedSeverity(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="all">All Severities</option>
-                          <option value="low">Low</option>
-                          <option value="medium">Medium</option>
-                          <option value="high">High</option>
-                        </select>
-                      </div>
-                      
-                      <div>
-                        <Label className="text-xs text-gray-600 mb-2 block">Filter by Type</Label>
-                        <select
-                          value={selectedViolationType}
-                          onChange={(e) => setSelectedViolationType(e.target.value)}
-                          className="w-full px-3 py-2 border rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          <option value="all">All Types</option>
-                          {uniqueViolationTypes.map((type) => (
-                            <option key={type} value={type}>
-                              {type.replace(/_/g, " ")}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
+                <div className="text-3xl font-bold text-red-500">{trueTotalViolations}</div>
+                <p className={`text-xs mt-1 ${textSecondary}`}>Detected violations</p>
+              </CardContent>
+            </Card>
 
-                  {/* Violations List */}
-                  {filteredViolations.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Shield className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      {violations.length === 0 ? (
-                        <>
-                          <p>No violations detected yet. Great job maintaining exam integrity!</p>
-                        </>
-                      ) : (
-                        <>
-                          <p>No violations match your search or filters.</p>
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="mt-4"
-                            onClick={() => {
-                              setViolationSearch("")
-                              setSelectedSeverity("all")
-                              setSelectedViolationType("all")
-                            }}
-                          >
-                            Clear Filters
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {filteredViolations.map((violation) => (
-                        <div key={violation.id} className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                          <div className="space-y-2 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <h3 className="font-medium">{violation.studentName}</h3>
-                              <Badge variant="outline" className="bg-red-50 text-red-800 border-red-200 font-mono text-xs">
-                                {violation.violationType.replace(/_/g, " ")}
-                              </Badge>
-                              <Badge className={getSeverityColor(violation.severity)}>{violation.severity.toUpperCase()}</Badge>
-                            </div>
-                            <p className="text-sm text-gray-600 font-medium">{violation.examTitle}</p>
-                            <p className="text-sm text-gray-700">{violation.description}</p>
-                            <div className="flex items-center justify-between pt-2 border-t">
-                              <p className="text-xs text-gray-500">{new Date(violation.timestamp).toLocaleString()}</p>
-                              <span className="text-xs font-mono text-gray-500">ID: {violation.id}</span>
-                            </div>
+            <Card className={`backdrop-blur-sm shadow-xl transition-colors duration-300 ${cardBg}`}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className={`text-sm font-medium ${textSecondary}`}>Quick Actions</CardTitle>
+                <Plus className={`h-4 w-4 ${textSecondary}`} />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Dialog open={showCreateExam} onOpenChange={setShowCreateExam}>
+                  <DialogTrigger asChild>
+                    <Button className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold shadow-lg">
+                      <Plus className="h-4 w-4 mr-2" /> Create New Exam
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className={`max-w-lg max-h-[90vh] overflow-hidden flex flex-col ${dialogBg}`}>
+                    <DialogHeader className="flex-shrink-0">
+                      <DialogTitle className={textPrimary}>Create New Exam</DialogTitle>
+                      <DialogDescription className={textSecondary}>Set up a new proctored exam</DialogDescription>
+                    </DialogHeader>
+
+                    {/* Form Scrollable Content */}
+                    <div className="flex-1 overflow-y-auto px-1 custom-scrollbar">
+                      <div className="space-y-4 pb-4 mt-2">
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="examTitle" className={textPrimary}>Exam Title *</Label>
+                          <Input id="examTitle" placeholder="e.g., Mathematics Final Exam" value={newExam.title} onChange={(e) => setNewExam({ ...newExam, title: e.target.value })} className={inputBg} />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="examCode" className={textPrimary}>Exam Code *</Label>
+                          <Input id="examCode" placeholder="e.g., MATH101" value={newExam.examCode} onChange={(e) => setNewExam({ ...newExam, examCode: e.target.value })} className={`${inputBg} uppercase`} />
+                          <p className={`text-xs ${textSecondary}`}>Students will use this exact code to access the exam.</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="examDescription" className={textPrimary}>Description</Label>
+                          <Textarea id="examDescription" placeholder="Brief description of the exam" value={newExam.description} onChange={(e) => setNewExam({ ...newExam, description: e.target.value })} rows={3} className={inputBg} />
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label htmlFor="duration" className={textPrimary}>Duration (minutes)</Label>
+                          <Input id="duration" type="number" min="1" max="480" value={newExam.duration} onChange={(e) => setNewExam({ ...newExam, duration: Number.parseInt(e.target.value) || 60 })} className={inputBg} />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="startTime" className={textPrimary}>Start Time</Label>
+                            <Input id="startTime" type="datetime-local" value={newExam.startTime} onChange={(e) => setNewExam({ ...newExam, startTime: e.target.value })} className={inputBg} />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="endTime" className={textPrimary}>End Time (Optional)</Label>
+                            <Input id="endTime" type="datetime-local" value={newExam.endTime} onChange={(e) => setNewExam({ ...newExam, endTime: e.target.value })} className={inputBg} />
                           </div>
                         </div>
-                      ))}
+                      </div>
                     </div>
-                  )}
-                </div>
+                    
+                    <div className={`flex-shrink-0 pt-4 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                      <Button onClick={handleCreateExam} className="w-full bg-blue-600 hover:bg-blue-500 text-white">
+                        Create Exam
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <Button 
+                  onClick={() => window.open("https://docs.google.com/spreadsheets/d/1AtR9VxLeKRLtCWMnf5qxwMQ9RjCZDATqSobqIdm_8Zo/edit?gid=0#gid=0", "_blank")}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg"
+                >
+                  <FileText className="h-4 w-4 mr-2" /> Proceed to Google Sheet
+                </Button>
               </CardContent>
             </Card>
-          </TabsContent>
+          </div>
 
-          <TabsContent value="monitoring" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Activity className="h-5 w-5" />
-                      Live Monitoring ({filteredSessions.length} of {activeSessions.length})
-                    </CardTitle>
-                    <CardDescription>Real-time monitoring of students currently taking exams - click on a session to view violations</CardDescription>
+          {/* Main Dashboard Tabs */}
+          <Tabs defaultValue="exams" className="space-y-6">
+            <TabsList className={`backdrop-blur-sm p-1 rounded-lg h-12 shadow-md transition-colors duration-300 ${cardBg}`}>
+              <TabsTrigger value="exams" className={`h-full px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white ${isDarkMode ? 'text-slate-400' : 'text-slate-500'} font-semibold rounded-md transition-all`}>Teacher Logs</TabsTrigger>
+              <TabsTrigger value="monitoring" className={`h-full px-6 data-[state=active]:bg-blue-600 data-[state=active]:text-white ${isDarkMode ? 'text-slate-400' : 'text-slate-500'} font-semibold rounded-md transition-all`}>Activity Logs</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="exams" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <Card className={`backdrop-blur-sm shadow-2xl transition-colors duration-300 ${cardBg}`}>
+                <CardHeader>
+                  <CardTitle className={`flex items-center gap-2 ${textPrimary}`}>
+                    <FileText className="h-5 w-5 text-blue-500" /> My Exams Sessions ({exams.length})
+                  </CardTitle>
+                  <CardDescription className={`mt-1 ${textSecondary}`}>Manage your created exams</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {exams.length === 0 ? (
+                      <div className={`text-center py-12 border border-dashed rounded-xl ${emptyBoxBg}`}>
+                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-30 text-blue-500" />
+                        <p>No exams created yet. Create your first exam to get started!</p>
+                      </div>
+                    ) : (
+                      exams.map((exam) => (
+                        <div key={exam.id} className={`flex items-center justify-between p-4 border rounded-xl transition-colors shadow-sm ${rowBg}`}>
+                          <div className="flex-1">
+                            <h3 className={`font-semibold text-lg ${textPrimary}`}>{exam.title}</h3>
+                            <p className={`text-sm mt-1 ${textSecondary}`}>{exam.description}</p>
+                            <p className={`text-xs mt-2 ${textSecondary}`}>
+                              Created: {new Date(exam.createdAt).toLocaleDateString()} • Duration: {exam.duration} min
+                            </p>
+                            {exam.startTime && <p className={`text-xs ${textSecondary}`}>Start: {formatDisplayDate(exam.startTime)}</p>}
+                            <p className="text-xs font-mono bg-blue-500/10 text-blue-500 border border-blue-500/20 px-2 py-1 rounded inline-block mt-2">
+                              Exam Code: {exam.uniqueId}
+                            </p>
+                          </div>
+                          <div className="flex items-center space-x-3">
+                            <Badge className={getStatusColor(exam.status)}>{exam.status}</Badge>
+                            {getStatusActions(exam)}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => teacherData && pollLiveData(teacherData.id)}
-                    disabled={isRefreshing}
-                    className="flex items-center gap-2"
-                  >
-                    <Activity className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
-                    {isRefreshing ? 'Refreshing...' : 'Refresh'}
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {/* Search Bar */}
-                  <div className="flex gap-2 pb-4 border-b">
-                    <Input
-                      placeholder="Search by student name, ID, or exam..."
-                      value={monitoringSearch}
-                      onChange={(e) => setMonitoringSearch(e.target.value)}
-                      className="flex-1"
-                    />
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="monitoring" className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <Card className={`backdrop-blur-sm shadow-2xl transition-colors duration-300 ${cardBg}`}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className={`flex items-center gap-2 ${textPrimary}`}>
+                        <List className="h-5 w-5 text-blue-500" />
+                        Activity Logs ({filteredSessions.length} of {activeSessions.length})
+                      </CardTitle>
+                      <CardDescription className={`mt-1 ${textSecondary}`}>Logs of students currently taking exams</CardDescription>
+                    </div>
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setMonitoringSearch("")}
+                      onClick={() => teacherData && pollLiveData(teacherData.id)}
+                      disabled={isRefreshing}
+                      className={`flex items-center gap-2 ${isDarkMode ? 'border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white bg-slate-900/50' : 'border-slate-300 text-slate-700 hover:bg-slate-100 bg-white'}`}
                     >
-                      Clear
+                      <Activity className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                      {isRefreshing ? 'Refreshing...' : 'Manual Refresh'}
                     </Button>
                   </div>
-
-                  {/* Sessions List */}
-                  {activeSessions.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No active exam sessions at the moment.</p>
-                      <p className="text-sm">Students taking exams will appear here in real-time.</p>
-                    </div>
-                  ) : filteredSessions.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      <Eye className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                      <p>No sessions match your search.</p>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-4"
-                        onClick={() => setMonitoringSearch("")}
-                      >
-                        Clear Search
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {filteredSessions.map((session) => (
-                        <div
-                          key={session.id}
-                          onClick={() => setSelectedSession(selectedSession?.id === session.id ? null : session)}
-                          className="flex items-start justify-between p-4 border rounded-lg bg-gradient-to-r from-blue-50 to-transparent hover:shadow-md transition-all cursor-pointer hover:border-blue-300"
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    
+                    <div className={`space-y-4 pb-4 border-b ${isDarkMode ? 'border-slate-800' : 'border-slate-200'}`}>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Search by student name, ID, or exam..."
+                          value={monitoringSearch}
+                          onChange={(e) => setMonitoringSearch(e.target.value)}
+                          className={`flex-1 ${inputBg}`}
+                        />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setMonitoringSearch("")
+                            setSelectedSeverity("all")
+                            setSelectedViolationType("all")
+                          }}
+                          className={`h-10 px-4 ${isDarkMode ? 'border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white bg-slate-900/50' : 'border-slate-300 text-slate-700 hover:bg-slate-100 bg-white'}`}
                         >
-                          <div className="space-y-2 flex-1">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-medium text-gray-900">{session.student_name}</h3>
-                              <Badge variant="outline" className="bg-green-50 text-green-800 border-green-200">
-                                <span className="w-2 h-2 bg-green-500 rounded-full inline-block mr-1"></span>
-                                Active
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-gray-600">{session.exam_title}</p>
-                            {(() => {
-                              // Match violations differently based on session type
-                              let sessionViolations;
+                          Clear Filters
+                        </Button>
+                      </div>
 
-                              if (session.is_google_sheets) {
-                              // For Google Sheets sessions: match by student name and exam title
-                              sessionViolations = violations.filter((v) => {
-                                const vStudent = v.studentName?.trim().toLowerCase();
-                                const vExam = v.examTitle?.trim().toLowerCase();
-                                const sStudent = session.student_name?.trim().toLowerCase();
-                                const sExam = (session.exam_title + ' Exam')?.trim().toLowerCase();
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label className={`text-xs mb-2 block font-medium uppercase tracking-wider ${textSecondary}`}>Filter by Severity</Label>
+                          <select
+                            value={selectedSeverity}
+                            onChange={(e) => setSelectedSeverity(e.target.value)}
+                            className={`w-full px-3 py-2.5 rounded-lg text-sm cursor-pointer border focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                          >
+                            <option value="all">All Severities</option>
+                            <option value="low">Low</option>
+                            <option value="medium">Medium</option>
+                            <option value="high">High</option>
+                          </select>
+                        </div>
+                        
+                        <div>
+                          <Label className={`text-xs mb-2 block font-medium uppercase tracking-wider ${textSecondary}`}>Filter by Type</Label>
+                          <select
+                            value={selectedViolationType}
+                            onChange={(e) => setSelectedViolationType(e.target.value)}
+                            className={`w-full px-3 py-2.5 rounded-lg text-sm cursor-pointer border focus:outline-none focus:ring-2 focus:ring-blue-500 ${isDarkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-slate-300 text-slate-900'}`}
+                          >
+                            <option value="all">All Types</option>
+                            {uniqueViolationTypes.map((type) => (
+                              <option key={type} value={type}>
+                                {type.replace(/_/g, " ")}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Sessions List */}
+                    {activeSessions.length === 0 ? (
+                      <div className={`text-center py-12 border border-dashed rounded-xl ${emptyBoxBg}`}>
+                        <Eye className="h-12 w-12 mx-auto mb-4 opacity-30 text-blue-500" />
+                        <p className={`text-lg font-medium mb-1 ${textPrimary}`}>No active exam sessions</p>
+                        <p className="text-sm">Students taking exams will appear here.</p>
+                      </div>
+                    ) : filteredSessions.length === 0 ? (
+                      <div className={`text-center py-12 border border-dashed rounded-xl ${emptyBoxBg}`}>
+                        <Eye className="h-12 w-12 mx-auto mb-4 opacity-30 text-blue-500" />
+                        <p>No sessions match your current filters.</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className={`mt-4 ${isDarkMode ? 'border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white' : 'border-slate-300 text-slate-700 hover:bg-slate-100'}`}
+                          onClick={() => {
+                            setMonitoringSearch("")
+                            setSelectedSeverity("all")
+                            setSelectedViolationType("all")
+                          }}
+                        >
+                          Clear Filters
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {filteredSessions.map((session) => (
+                          <div
+                            key={session.id}
+                            onClick={() => setSelectedSession(selectedSession?.id === session.id ? null : session)}
+                            className={`flex items-start justify-between p-4 border rounded-xl transition-all cursor-pointer shadow-sm ${rowBg} ${isDarkMode ? 'hover:border-blue-500/50' : 'hover:border-blue-300'}`}
+                          >
+                            <div className="space-y-2 flex-1">
+                              <div className="flex items-center gap-2">
+                                <h3 className={`font-bold text-lg ${textPrimary}`}>{session.student_name}</h3>
+                              </div>
+                              <p className={`text-sm font-medium ${textSecondary}`}>{session.exam_title}</p>
+                              
+                              <div className={`flex items-center gap-4 text-xs mt-2 ${textSecondary}`}>
+                                <span className={`px-2 py-1 rounded border shadow-inner ${isDarkMode ? 'bg-slate-900 border-slate-700' : 'bg-slate-100 border-slate-300'}`}>ID: {session.student_id}</span>
                                 
-                                return v.exam_session_id === null && 
-                                      vStudent === sStudent && 
-                                      (vExam === sExam || vExam === session.exam_title?.trim().toLowerCase());
-                                  });
-                                } else {
-                              // For real Next.js sessions: match by session ID
-                              sessionViolations = violations.filter(
-                                (v) => v.exam_session_id && v.exam_session_id === parseInt(session.id)
-                                );
-                               }
-                              return (
-                                <>
-                                  <div className="flex items-center gap-4 text-xs text-gray-500">
-                                    <span>Student ID: {session.student_id}</span>
-                                    <span>Started: {new Date(session.start_time).toLocaleTimeString()}</span>
-                                    {sessionViolations.length > 0 && (
-                                      <Badge className="bg-red-100 text-red-800">
-                                        <AlertTriangle className="h-3 w-3 mr-1" />
-                                        {sessionViolations.length} Violation{sessionViolations.length !== 1 ? "s" : ""}
-                                      </Badge>
-                                    )}
-                                  </div>
+                                {/* FIX: Activity Logs now use the dedicated formatActivityDate to correct the shift */}
+                                <span>Started: {formatActivityDate(session.start_time)}</span>
+                                
+                                {/* @ts-ignore */}
+                                {session.matchingViolations && session.matchingViolations.length > 0 && (
+                                  <Badge className={isDarkMode ? "bg-red-900/30 text-red-400 border border-red-800" : "bg-red-100 text-red-700 border border-red-300"}>
+                                    <AlertTriangle className="h-3 w-3 mr-1" />
+                                    {/* @ts-ignore */}
+                                    {session.matchingViolations.length} Violation{session.matchingViolations.length !== 1 ? "s" : ""}
+                                  </Badge>
+                                )}
+                              </div>
 
-                                  {/* Expanded Violations View */}
-                                  {selectedSession?.id === session.id && (
-                                    <div className="mt-4 pt-4 border-t space-y-3">
-                                      <h4 className="font-medium text-sm">Violations for this session ({sessionViolations.length}):</h4>
-                                      {sessionViolations.length === 0 ? (
-                                        <p className="text-xs text-gray-500 italic">No violations recorded for this session.</p>
-                                      ) : (
-                                        <div className="space-y-2">
-                                          {sessionViolations.map((violation) => (
-                                            <div key={violation.id} className="bg-white border border-red-100 rounded p-3 space-y-1">
-                                              <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="bg-red-50 text-red-800 border-red-200 font-mono text-xs">
-                                                  {violation.violationType.replace(/_/g, " ")}
-                                                </Badge>
-                                                <Badge className={getSeverityColor(violation.severity)}>
-                                                  {violation.severity.toUpperCase()}
-                                                </Badge>
-                                              </div>
-                                              <p className="text-xs text-gray-700">{violation.description}</p>
-                                              <p className="text-xs text-gray-500">{new Date(violation.timestamp).toLocaleString()}</p>
-                                            </div>
-                                          ))}
+                              {/* Expanded Violations View */}
+                              {selectedSession?.id === session.id && (
+                                <div className={`mt-4 pt-4 border-t space-y-3 ${isDarkMode ? 'border-slate-700/50' : 'border-slate-200'}`}>
+                                  {/* @ts-ignore */}
+                                  <h4 className={`font-semibold text-sm ${textPrimary}`}>Violations Matching Filters ({session.matchingViolations.length}):</h4>
+                                  {/* @ts-ignore */}
+                                  {session.matchingViolations.length === 0 ? (
+                                    <p className={`text-xs italic p-2 rounded border ${isDarkMode ? 'text-green-400 bg-green-900/10 border-green-900/30' : 'text-green-700 bg-green-50 border-green-200'}`}>No violations recorded for this session that match your filter.</p>
+                                  ) : (
+                                    <div className="space-y-2">
+                                      {/* @ts-ignore */}
+                                      {session.matchingViolations.map((violation: Violation) => (
+                                        <div key={violation.id} className={`border rounded-lg p-3 space-y-2 shadow-inner ${isDarkMode ? 'bg-slate-900 border-red-900/50' : 'bg-white border-red-200'}`}>
+                                          <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className={`font-mono text-xs ${isDarkMode ? 'bg-red-900/20 text-red-400 border-red-800' : 'bg-red-50 text-red-700 border-red-200'}`}>
+                                              {violation.violationType.replace(/_/g, " ")}
+                                            </Badge>
+                                            <Badge className={getSeverityColor(violation.severity)}>
+                                              {violation.severity.toUpperCase()}
+                                            </Badge>
+                                          </div>
+                                          <p className={`text-xs leading-relaxed ${textPrimary}`}>{violation.description}</p>
+                                          {/* FIX: Activity Logs now use the dedicated formatActivityDate */}
+                                          <p className={`text-[10px] font-mono ${textSecondary}`}>{formatActivityDate(violation.timestamp)}</p>
                                         </div>
-                                      )}
+                                      ))}
                                     </div>
                                   )}
-                                </>
-                              )
-                            })()}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </main>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
+        </main>
+      </div>
     </div>
   )
 }

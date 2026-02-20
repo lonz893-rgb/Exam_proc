@@ -1,7 +1,7 @@
 /* exam.js - COMPLETE CODE with Fullscreen Enforcement + Violation Logging + V2 Skipped Logic + FIXED COUNTERS */
 
 // Fallback API URL (kept for backwards-compatibility)
-const FALLBACK_ANSWER_API_URL = "https://script.google.com/macros/s/AKfycby6B9OgDmMNJqGmDNBvF7MJnAaV1wXTnvmzjjCEqn8vIh1zEFx7Izn3jxEJIsvnuXF4/exec";
+const FALLBACK_ANSWER_API_URL = "https://script.google.com/macros/s/AKfycbzD91fLtEjVXi3A2y3pNBeToiUuOWwbMNcWUC-TYVn2VnEte0yxzbjpa12n42yboqD2/exec";
 // Next.js API URL for violation logging to dashboard
 const NEXTJS_API_URL = window.NEXTJS_API_URL || '';
 

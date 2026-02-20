@@ -12,7 +12,7 @@ export async function GET() {
       success: true,
       teachers: teachers || [],
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching teachers:", error)
     return NextResponse.json(
       { success: false, message: "Failed to fetch teachers", error: error.message },
@@ -24,28 +24,31 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     console.log("Creating new teacher...")
-    const { name, email, department, status } = await request.json()
+    // MODIFIED: We now pull 'password' instead of 'department'
+    const { name, email, password, status } = await request.json()
 
-    if (!name || !email || !department) {
-      return NextResponse.json({ success: false, message: "Name, email, and department are required" }, { status: 400 })
+    // MODIFIED: Check for password instead of department
+    if (!name || !email || !password) {
+      return NextResponse.json({ success: false, message: "Name, email, and password are required" }, { status: 400 })
     }
 
     // Check if email already exists
-    const existingTeacher = await executeQuery("SELECT id FROM teachers WHERE email = ?", [email])
+    const existingTeacher = await executeQuery("SELECT id FROM teachers WHERE email = ?", [email]) as any[]
     if (existingTeacher && existingTeacher.length > 0) {
       return NextResponse.json({ success: false, message: "Email already exists" }, { status: 400 })
     }
 
-    // Generate default password and hash it
-    const defaultPassword = "password123"
-    const hashedPassword = await bcrypt.hash(defaultPassword, 10)
+    // MODIFIED: Hash the actual password provided by the Admin instead of a default one
+    const hashedPassword = await bcrypt.hash(password, 10)
+    const fallbackDepartment = "N/A" // Safety fallback so the database doesn't crash
 
     const query = `
       INSERT INTO teachers (name, email, password_hash, department, status, employee_id) 
       VALUES (?, ?, ?, ?, ?, ?)
     `
     const employeeId = `EMP${Date.now().toString().slice(-6)}`
-    const result = await executeQuery(query, [name, email, hashedPassword, department, status || "active", employeeId])
+    
+    const result = await executeQuery(query, [name, email, hashedPassword, fallbackDepartment, status || "active", employeeId]) as any
 
     console.log("Teacher created successfully:", result)
 
@@ -53,9 +56,8 @@ export async function POST(request: NextRequest) {
       success: true,
       message: "Teacher created successfully",
       teacherId: result.insertId,
-      defaultPassword: defaultPassword,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating teacher:", error)
     return NextResponse.json(
       { success: false, message: "Failed to create teacher", error: error.message },

@@ -46,7 +46,7 @@ let examTimerSeconds = 30;
 let userInfo = { lastName: '', firstName: '', code: '', startTime: '', endTime: '', date: '' }; // Removed email, teacher, subject, schedule
 
 // Replace this with your actual Google Apps Script Web App URL
-const ANSWER_API_URL = "https://script.google.com/macros/s/AKfycby6B9OgDmMNJqGmDNBvF7MJnAaV1wXTnvmzjjCEqn8vIh1zEFx7Izn3jxEJIsvnuXF4/exec";
+const ANSWER_API_URL = "https://script.google.com/macros/s/AKfycbzD91fLtEjVXi3A2y3pNBeToiUuOWwbMNcWUC-TYVn2VnEte0yxzbjpa12n42yboqD2/exec";
 let tabWarnings = 0;
 let isExamActive = false;
 let violationLock = false; 
