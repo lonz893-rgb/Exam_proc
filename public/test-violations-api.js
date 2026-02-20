@@ -10,7 +10,7 @@
  * 2. Run this script: node test-violations-api.js
  */
 
-const API_URL = 'http://localhost:3000/api/violations';
+const API_URL = 'app/api/violations';
 
 console.log('🧪 Testing Violations API...\n');
 
