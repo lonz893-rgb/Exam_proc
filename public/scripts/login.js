@@ -65,7 +65,7 @@ if (startBtn) {
       // =========================================================
       const nextJsUrl = window.NEXTJS_API_URL || '';
       if (nextJsUrl) {
-        const verifyRes = await fetch(`${nextJsUrl}/api/exams/verify?code=${encodeURIComponent(checkData.code)}`);
+        const verifyRes = await fetch(`app/api/exams/verify?code=${encodeURIComponent(checkData.code)}`);
         const verifyData = await verifyRes.json();
 
         if (!verifyData.success) {
